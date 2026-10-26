@@ -145,7 +145,8 @@ def process(misp, misp_webapp, event, focus_points: dict, keep_open_for: str = "
     # Add a minimal zsazsa-flash-intel object so the webapp wizard can edit
     # the draft. The summary seeds with the LLM body; analyst refines fields
     # before approving and publishing.
-    object_saved = _add_flash_intel_object(misp_webapp, product_event, fia_id, event, fia_content, matched)
+    object_saved = _add_flash_intel_object(misp_webapp, product_event, fia_id, event, fia_content, matched,
+                                           relevance.get("reason", ""))
 
     # Mark the source event as routed for review (not yet complete). If that
     # does not take, the event still reads as incomplete and the next run makes
@@ -231,7 +232,7 @@ def _auto_publish(misp_webapp, product_event, fia_id, content, recipients):
     logger.info("%s auto-published to %d subscriber(s): %s", fia_id, len(recipients), detail)
 
 
-def _add_flash_intel_object(misp_webapp, product_event, fia_id, source_event, content, matched):
+def _add_flash_intel_object(misp_webapp, product_event, fia_id, source_event, content, matched, reason):
     """Attach a draft zsazsa-flash-intel object to the product event. False when MISP refused it."""
     from webapp import misp_store
 
@@ -253,6 +254,8 @@ def _add_flash_intel_object(misp_webapp, product_event, fia_id, source_event, co
     add("author", "analyser")
     if matched:
         add("affected-assets", ", ".join(matched))
+        # The model's own words, for the analyst to judge the match by.
+        add("analyser-reason", f"Focus points: {', '.join(matched)}. {reason}".strip())
     try:
         # Everyone the alert can reach, for the analyst to narrow down.
         add("audience", misp_store.subscriber_audience(_FLASH_INTEL_PRODUCT_NAME, _AUTO_TLP))

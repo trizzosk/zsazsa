@@ -66,6 +66,16 @@ class InPlace(unittest.TestCase):
         self.assertEqual(misp_store._obj_attr(obj, "title"), "New")
         self.assertEqual(misp_store._obj_attr(obj, "creator"), "a@example.org")
 
+    def test_an_edit_keeps_why_the_analyser_made_it(self):
+        """The form does not send it, and the list shows it under the title."""
+        for build, update in ((misp_store._fia_obj, misp_store.update_fia), (misp_store._vea_obj, misp_store.update_vea)):
+            with self.subTest(update.__name__):
+                stored = build({"title": "Old", "analyser_reason": "Matches PIR-003 on Insurance (Sector)"})
+                misp = self.store(stored)
+                update(UUID, {"title": "New", "tlp": "amber"})
+                self.assertEqual(misp_store._obj_attr(self.written(misp, stored), "analyser-reason"),
+                                 "Matches PIR-003 on Insurance (Sector)")
+
     def test_a_vulnerability_advisory(self):
         stored = misp_store._vea_obj({"vea_id": "VEA-0001", "title": "Old", "cve_id": "CVE-2026-1"})
         misp = self.store(stored)

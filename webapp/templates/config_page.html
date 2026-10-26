@@ -889,6 +889,9 @@
                     The <a href="https://github.com/cudeso/ai-connector" target="_blank" rel="noopener">ai-connector</a>
                     misp-modules server, with the settings MISP has for it under <code>Plugin.AI_*</code>. The module runs its
                     own prompts, so it cannot be the default provider or be chosen for a feature.
+                    In data collection it summarises the events of another MISP server, once that server has
+                    "Allow adding reports to events" switched on under
+                    <a href="{{ url_for('collection_sources.index') }}">Collection sources</a>.
                   </p>
                   <div class="row g-3 mb-3">
                     <div class="col-md-8">

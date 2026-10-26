@@ -5,7 +5,8 @@ by what the other filters let through, so that a bar still offers every choice;
 a click on one filters the list and sets its dropdown. The RFI list leaves the
 closed ones out until asked for them, or for their status, the PIR list the
 rejected ones and the GIR list the retired ones, and the status board says how
-many there are.
+many there are. An alert or advisory the analyser drafted says why under its
+title.
 
 Records come from the store's own builders, so they have every field the
 templates read; the database and log are temporary.
@@ -280,6 +281,18 @@ class ProductLists(_Page):
                 self.assertIn("SOC 2", self.stats(both))
                 self.assertIn(path + "?tlp=AMBER%2BSTRICT&audience=SOC",
                               [a["href"] for a in page.select(".list-stats a.chart-filter")])
+
+    def test_a_draft_says_why_the_analyser_made_it(self):
+        """Under the title. Part of it is the model's own words, so it is escaped."""
+        fias = [_fia(1, "draft", analyser_reason="Focus points: Palo Alto. <b>Unit 42</b> wrote it."), _fia(2, "draft")]
+        veas = [_vea(1, "draft", analyser_reason="The event names CVE-2026-0257.")]
+        with mock.patch.object(misp_store, "list_fias", return_value=fias), \
+             mock.patch.object(misp_store, "list_veas", return_value=veas):
+            alerts, advisories = self.page("/products/flash-intel/"), self.page("/products/vea/")
+        reasons = [div.get_text() for div in alerts.select("tbody tr[id^=fia-row] td:nth-of-type(2) .text-muted")]
+        self.assertEqual(reasons, ["Focus points: Palo Alto. <b>Unit 42</b> wrote it."])
+        self.assertIn("The event names CVE-2026-0257.",
+                      advisories.select_one("tbody tr[id^=vea-row] td:nth-of-type(3) .text-muted").get_text())
 
     def test_the_bars_stay_when_the_filters_leave_nothing(self):
         """The bars went with the last record, and with them the way back."""

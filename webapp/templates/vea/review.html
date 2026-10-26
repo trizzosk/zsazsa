@@ -84,6 +84,7 @@
           <td>
             {{ v.title or v.cve_id or '(untitled)' }}
             {{ audience_badges(v.audience) }}
+            {% if v.analyser_reason %}<div class="small text-muted">{{ v.analyser_reason | md_inline }}</div>{% endif %}
           </td>
           <td><span class="tlp-badge tlp-{{ v.tlp | slug }}">TLP:{{ v.tlp | upper }}</span></td>
           <td>

@@ -30,7 +30,8 @@ class Object(unittest.TestCase):
         with mock.patch.object(flash_intel.tagger, "get_source_feed", return_value="feed"), \
              mock.patch("webapp.misp_store.subscriber_audience", return_value=self.reachable) as self.audience:
             saved = flash_intel._add_flash_intel_object(
-                misp_webapp, MISPEvent(), "FIA-00007", source, "## Summary\nOne line.", ["energy"])
+                misp_webapp, MISPEvent(), "FIA-00007", source, "## Summary\nOne line.", ["energy"],
+                "The article is about a power grid operator.")
         return saved, misp_webapp.add_object.call_args[0][1]
 
     def test_it_is_built_from_its_template(self):
@@ -44,6 +45,11 @@ class Object(unittest.TestCase):
         _saved, obj = self.add({"Object": {}})
         self.audience.assert_called_once_with("Flash intel alert", "amber")
         self.assertEqual({a.object_relation: a.value for a in obj.attributes}["audience"], "SOC, CTI")
+
+    def test_it_says_which_focus_points_the_model_matched_and_why(self):
+        _saved, obj = self.add({"Object": {}})
+        self.assertEqual({a.object_relation: a.value for a in obj.attributes}["analyser-reason"],
+                         "Focus points: energy. The article is about a power grid operator.")
 
     def test_it_is_a_draft_that_names_its_source(self):
         """A draft, as everything else the analyser makes is, and its source is
@@ -65,7 +71,8 @@ class Object(unittest.TestCase):
 
 
 class Process(unittest.TestCase):
-    RELEVANT = {"relevant": True, "matched_focus_points": ["energy"], "source_type": "news-report"}
+    RELEVANT = {"relevant": True, "matched_focus_points": ["energy"], "source_type": "news-report",
+                "reason": "The article is about a power grid operator."}
 
     def run_process(self, object_saved=True, relevance=RELEVANT, keep_open_for=""):
         misp = mock.create_autospec(PyMISP, instance=True)
@@ -79,7 +86,7 @@ class Process(unittest.TestCase):
              mock.patch.object(flash_intel, "_get_reports", return_value=("article", [report])), \
              mock.patch.object(flash_intel.llm, "check_relevance", return_value=relevance), \
              mock.patch.object(flash_intel.llm, "generate_flash_intel", return_value="## Summary\nx") as generate, \
-             mock.patch.object(flash_intel, "_add_flash_intel_object", return_value=object_saved), \
+             mock.patch.object(flash_intel, "_add_flash_intel_object", return_value=object_saved) as self.add_object, \
              mock.patch.object(flash_intel, "_automated_subscribers", return_value=[]), \
              mock.patch.object(flash_intel, "tagger") as tagger:
             result = flash_intel.process(misp, misp_webapp, event, {}, keep_open_for=keep_open_for)
@@ -106,6 +113,10 @@ class Process(unittest.TestCase):
         result, tagger, event, _report = self.run_process(
             relevance={"relevant": False, "reason": "Off topic", "matched_focus_points": []})
         tagger.set_workflow_state.assert_called_once_with(mock.ANY, event, "rejected")
+
+    def test_the_draft_keeps_the_model_s_reason(self):
+        self.run_process(True)
+        self.assertEqual(self.add_object.call_args.args[5:], (["energy"], "The article is about a power grid operator."))
 
     def test_its_event_has_the_draft_workflow_state(self):
         self.run_process(True)

@@ -344,7 +344,7 @@ This option is **CVE-driven**.
 
 1. For each event it looks for a CVE in its vulnerability attributes, and otherwise in its title.
 2. An event with at least one CVE gets a **vulnerability advisory draft**. The CVE is enriched from a vulnerability database (CVSS score, affected products and versions, description) and the advisory sections are drafted by the AI.
-3. An event with no CVE is skipped and logged as **"no CVE found"**.
+3. An event with no CVE is skipped and logged as **"no CVE found"**. So is one whose CVEs are already in a draft or an advisory in review.
 4. With the **asset database** on (Settings > Products), only a CVE in a product of your inventory makes a draft. See [Products](#products).
 
 ### The three options side by side
@@ -355,7 +355,7 @@ This option is **CVE-driven**.
 | Flash intel alert | Today's scraped events that match an active PIR or GIR | Events logged as "no PIR/GIR match" | One flash intel draft per matched event |
 | Vulnerability advisory | Today's scraped events that mention a CVE | Events logged as "no CVE found" | One vulnerability advisory draft per CVE event |
 
-In every case the analyser stops at drafts. Publishing and sending to stakeholders is always a separate step you take by hand. The drafts come with an audience, which an alert or advisory needs before it can be published: a flash intel alert from a PIR or GIR is for the roles of the requirement's owner and of the stakeholders it is distributed to, and any other alert or advisory for the roles of everyone who can receive it, its subscribers cleared for its TLP. Narrow it down before publishing where that is too wide.
+In every case the analyser stops at drafts. Publishing and sending to stakeholders is always a separate step you take by hand. The drafts come with an audience, which an alert or advisory needs before it can be published: a flash intel alert from a PIR or GIR is for the roles of the requirement's owner and of the stakeholders it is distributed to, and any other alert or advisory for the roles of everyone who can receive it, its subscribers cleared for its TLP. Narrow it down before publishing where that is too wide. The alert and advisory lists show under each title why the analyser made the draft.
 
 ### The scheduled analyser
 
@@ -555,7 +555,7 @@ The AI tab starts with the LLM providers card, one section per provider. **OpenA
 
 Each provider has its own enable switch, and one provider is marked as the default with the "Default provider" button. A provider cannot be disabled while features still point at it.
 
-**AI-connector MISP module** is the [ai-connector](https://github.com/cudeso/ai-connector) misp-modules server, with the settings MISP has for it under `Plugin.AI_*`. On misp-docker it is at `http://ai-connector`, port 6667. Give an Ollama model with its tag, for example `llama3.1:latest`. It runs its own prompts, so no feature can choose it; its "Summarise MISP event" is a fixed row in the feature table. "Test connection" checks the module and the model, as MISP's "Test LLM" does. In data collection it can summarise events from a MISP server that allows adding reports. The summary is saved as an `[AI-Event-Summary]` report.
+**AI-connector MISP module** is the [ai-connector](https://github.com/cudeso/ai-connector) misp-modules server, with the settings MISP has for it under `Plugin.AI_*`. On misp-docker it is at `http://ai-connector`, port 6667. Give an Ollama model with its tag, for example `llama3.1:latest`. It runs its own prompts, so no feature can choose it; its "Summarise MISP event" is a fixed row in the feature table. "Test connection" checks the module and the model, as MISP's "Test LLM" does. In data collection it summarises events from another MISP server, once "Allow adding reports to events" is on for that server under Collection sources. A new server has it off. The summary is saved as an `[AI-Event-Summary]` report.
 
 Below the providers, a table lists each AI-assisted feature (for example summarising a report or generating a Flash Intel Alert draft) with the provider it uses, an optional per-feature model override, a sampling temperature, and the prompt file it uses. An empty model field means the feature uses the default model of its provider. An empty temperature leaves sampling to the model, which for a locally hosted model can mean a value as high as 1.0; since almost every feature here is parsed back into structured data, a low temperature between 0 and 0.2 keeps that output stable. Not every model takes every setting: an OpenAI reasoning model only accepts its default temperature while it reasons, and older models do not know `reasoning_effort`. A model that refuses one is asked again without it, once, and zsazsa remembers that for the model. This feature-level configuration is stored separately, in `data/ai_features.json`, rather than in `config/__init__.py`, and is therefore untouched by a Settings save and not covered by the config backup.
 
@@ -611,7 +611,7 @@ Everything zsazsa writes in the `zsazsa:` namespace is attached as a local tag, 
 | `COLLECTION_TAG_STRIP_PREFIXES` | Tag prefixes shortened on the data collection page |
 | `COLLECTION_TAG_HIDE_PREFIXES` | Tag prefixes hidden on the data collection page |
 
-The tab also shows the **product source markers**, the local tags applied to a scraper event when it is used as the source of a product: `zsazsa:product="daily-briefing"`, `zsazsa:product="flash-intel"`, `zsazsa:product="vea"` and `zsazsa:product="threat-landscape-report"`. These are fixed in the code, shown read-only with a link to browse the tagged events in MISP, and are not configuration settings.
+The tab also shows the **product source markers**, the local tags applied to a scraper event when it is used as the source of a product: `zsazsa:product="daily-briefing"`, `zsazsa:product="flash-intel"`, `zsazsa:product="vea"` and `zsazsa:product="threat-landscape-report"`. These are fixed in the code, shown read-only with a link to browse the tagged events in MISP, and are not configuration settings. Deleting a product, or removing a source event from it, takes the tag off unless another product of the same type still uses the event.
 
 ### Notifications
 
@@ -717,7 +717,7 @@ The scraper's own `subscribe` service must be running against this Redis. Publis
 
 #### Additional MISP servers
 
-The "Other MISP servers" card lists any extra MISP instances configured in `MISP_SERVERS`, such as community MISP servers. Use "Add MISP server" to create a new entry, then fill in a label, an optional ID (used as a URL slug, generated from the label if left blank), the server URL, API key and TLS verification setting. Only published events are fetched from these servers. Filtering is controlled with three tag fields, tags that an event must have any of, tags it must have all of, and tags that exclude it, plus an optional organisation filter that can either restrict results to a set of organisation UUIDs or exclude them. "Events from last (days)" sets how far back to look based on the event date, and "Max events" caps how many events are pulled. As with the scraper, each server can be tested, given a pull estimate, and have its query previewed before saving. Each server is saved individually with its own "Save server" button, can be enabled or disabled with the power icon, and can be deleted. With "Allow adding reports to events" on, data collection offers the AI summary on that server's events. zsazsa adds it as a report for your organisation only and publishes the event again without an e-mail. The API key must be able to modify and publish the event, which for another organisation's event means a site admin key. Disabling or deleting a server that is referenced by a PIR or GIR as a collection source will warn you first, since the reference itself is not removed.
+The "Other MISP servers" card lists any extra MISP instances configured in `MISP_SERVERS`, such as community MISP servers. Use "Add MISP server" to create a new entry, then fill in a label, an optional ID (used as a URL slug, generated from the label if left blank), the server URL, API key and TLS verification setting. Only published events are fetched from these servers. Filtering is controlled with three tag fields, tags that an event must have any of, tags it must have all of, and tags that exclude it, plus an optional organisation filter that can either restrict results to a set of organisation UUIDs or exclude them. "Events from last (days)" sets how far back to look based on the event date, and "Max events" caps how many events are pulled. As with the scraper, each server can be tested, given a pull estimate, and have its query previewed before saving. Each server is saved individually with its own "Save server" button, can be enabled or disabled with the power icon, and can be deleted. With "Allow adding reports to events" on, data collection offers the AI summary on that server's events, and the AI-connector summary when that module is enabled. A new server has it off. zsazsa adds a summary as a report for your organisation only and publishes the event again without an e-mail. The API key must be able to modify and publish the event, which for another organisation's event means a site admin key. Disabling or deleting a server that is referenced by a PIR or GIR as a collection source will warn you first, since the reference itself is not removed.
 
 | Field | Description |
 |---|---|
@@ -732,6 +732,7 @@ The "Other MISP servers" card lists any extra MISP instances configured in `MISP
 | Organisation filter | Include only, or exclude, events from the given organisation UUIDs |
 | Events from last (days) | How far back to look, based on the event date |
 | Max events | Maximum number of events pulled per query |
+| Allow adding reports to events | Offer the AI summaries on this server's events. Off for a new server |
 | Enabled | Whether the server is active and offered as a filter option |
 
 #### Manual collection sources

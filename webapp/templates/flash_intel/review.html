@@ -78,6 +78,7 @@
           <td>
             {{ f.title or '(untitled)' }}
             {{ audience_badges(f.audience) }}
+            {% if f.analyser_reason %}<div class="small text-muted">{{ f.analyser_reason | md_inline }}</div>{% endif %}
           </td>
           <td><span class="tlp-badge tlp-{{ f.tlp | slug }}">TLP:{{ f.tlp | upper }}</span></td>
           <td>

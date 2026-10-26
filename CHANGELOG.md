@@ -14,6 +14,7 @@
 - On the manual entry form, the AI summary ticks the scope items it names. The form also has a MITRE ATT&CK picker.
 - The scheduled analyser can also make flash intel alerts from PIRs and GIRs, vulnerability advisories and the daily briefing. Switch them on under Settings > System > Analyser.
 - An asset database for vulnerability advisories, under Settings > Products. The analyser only makes an advisory for a CVE in a product listed in a CSV file of your assets.
+- The alert and advisory lists show under the title why the analyser made a draft: the requirement, focus points or CVE it matched.
 - The audit log under Reporting > Logs is pruned after `AUDIT_LOG_RETENTION_DAYS`, 365 by default. 0 keeps it for good, which the Logs page then says.
 
 ### Changed
@@ -31,6 +32,7 @@
 - The intake checklist of a PIR can be corrected on its edit form.
 - With SSO, working in zsazsa keeps the MISP session alive: every five minutes, zsazsa requests MISP to refresh it.
 - The Technology field on the PIR, GIR, threat actor profile and briefing story forms suggests "Firewall, Windows, Web servers" instead of product names.
+- A detection engineering request tags its source event when it is a manual entry too, as an alert and an advisory do.
 - Webhook errors written to the log or shown by a channel test no longer include the `sig` parameter of a URL.
 - On the PIR and GIR forms, the "Output product format" list is sorted, with each product's icon and an icon to tick them all, and the collection sources are grouped by kind with the icons of the sources page.
 - The PIR and GIR distribution picker names a stakeholder's organisation instead of showing its UUID, and a GIR started from a stakeholder's page has that stakeholder as its owner and in its distribution, as a PIR already had.
@@ -40,6 +42,8 @@
 - An event gets at most one flash intel alert, whichever run made it.
 - The flash intel alerts and vulnerability advisories the analyser drafts have an audience, so they can be published once reviewed. An alert from a PIR or GIR is for the requirement's owner and the stakeholders it is distributed to, any other draft for everyone who can receive it.
 - An AI summary that fails on one event no longer ends an analyser run. The event goes on without one, and a later run tries again. A briefing story whose relevance check fails is kept for the analyst to judge.
+- The analyser skips a CVE that a draft or an advisory in review already covers, so an updated article no longer gets a second advisory.
+- The focus point prompt tells the model that the publisher of an article is not a match. Unit 42 posts matched "Palo Alto".
 - An analyser option whose search of the scraper MISP gets an error answer now fails and says why, instead of reporting no events.
 - With the scheduled daily briefing on, the hourly check against the focus points no longer rejects an event that matches no focus point. The event gets no alert and stays open, and the briefing judges it. With the briefing off, it is rejected as before, unless it matches an active PIR or GIR.
 
@@ -53,6 +57,7 @@
 - Updates to the follow-up flag. Flags lost when the cache was rebuilt come back, and a follow-up tag added or removed in MISP shows after the next refresh.
 - The labelled lines of an AI summary ran together into one paragraph in MISP.
 - AI summaries never tagged MITRE ATT&CK techniques, because zsazsa looked them up in the mitre-malware galaxy.
+- Deleting an alert, advisory, detection request or briefing left the `zsazsa:product` tag on its source events, which then never got another advisory or briefing story. The tag now comes off unless another product of that type uses the event, and editing the sources updates the tags too.
 
 ### Security
 
@@ -70,6 +75,9 @@
 - The new `ANALYSER_*` settings need nothing. By default the scheduled analyser only makes flash intel alerts from focus points, as before.
 - The first run after the upgrade removes audit log entries older than a year, and with them the delivery badge of products sent before then. The scheduled analyser runs on the new code without a restart, so to keep them, add `AUDIT_LOG_RETENTION_DAYS = 0`, or the number of days you want, to `config/__init__.py` before updating.
 - The `ASSET_INVENTORY_*` settings are new and need nothing: the asset database is off until switched on.
+- The `zsazsa-flash-intel` (version 5) and `zsazsa-vea` (version 3) templates have a new `analyser-reason` attribute. Nothing needs doing; older drafts show no reason.
+- With Docker, an update does not replace the prompts in `docker/volumes/prompts`. Copy the new `zsazsaprompts/flash_intel_relevance.md` there, or add its line about the publisher on the Prompts tab.
+- Source events of products deleted before this release keep their `zsazsa:product` tag. Remove it in MISP where it is in the way.
 - `PIPELINE_RUN_LOG_RETENTION_DAYS` now defaults to 90 days. A value already saved under Settings stays as it is.
 - Behind an outbound proxy, add `EnvironmentFile=-/etc/environment` to `/etc/systemd/system/zsazsa.service`, then `systemctl daemon-reload` and restart zsazsa.
 

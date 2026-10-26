@@ -16,7 +16,7 @@ from analyser import llm, tagger
 from analyser.reader import save_last_action
 from core import asset_inventory
 from core.db import log_event, log_pipeline_run_end, log_pipeline_run_start
-from core.vuln_lookup import fetch_cve_info
+from core.vuln_lookup import CVE_RE, fetch_cve_info
 from pymisp import MISPEventReport
 from webapp import audit, collection_cache, job_store, matching as req_matching, misp_store
 from webapp.collection_cache import AI_SUMMARY_PREFIX
@@ -795,6 +795,8 @@ def run_flash_intel_action(progress=None, days=1, since=None) -> dict:
             "source_event_uuids": [event.uuid],
             "context_tags": [f"match:{m.get('id', '')}" for m in matches[:3] if m.get("id")],
             "linked_pir_uuid": linked_pir_uuid,
+            "analyser_reason": "Matches " + "; ".join(
+                f"{m.get('id', '')} on {', '.join(m.get('matched_terms') or [])}" for m in matches[:3]),
             "review_state": misp_store.FIA_REVIEW_DRAFT,
         }
         misp_store.create_fia(data)
@@ -838,6 +840,16 @@ def _cve_in_inventory(cves, progress):
     return not_checked
 
 
+def _open_advisory_cves() -> dict:
+    """{CVE: the id of the draft or advisory in review that covers it}."""
+    covered = {}
+    for vea in misp_store.list_veas():
+        if vea.review_state in (misp_store.VEA_REVIEW_DRAFT, misp_store.VEA_REVIEW_PENDING):
+            for cve in CVE_RE.findall(vea.cve_id or ""):
+                covered.setdefault(cve.upper(), vea.vea_id)
+    return covered
+
+
 def run_vea_action(progress=None, days=1, since=None) -> dict:
     # With the asset inventory on, a CVE only makes an advisory when it is in a
     # product we run. Reading it first fails the run on a bad file before the
@@ -860,6 +872,10 @@ def run_vea_action(progress=None, days=1, since=None) -> dict:
     _emit(progress, "detect-cves", "completed", f"CVE detection complete: {cve_match_count} event(s) with CVE match.")
     # Everyone an advisory can reach, for the analyst to narrow down.
     audience = misp_store.subscriber_audience("Vulnerability advisory", "amber") if cve_match_count else ""
+    # A CVE that a draft or an advisory in review already covers gets no second
+    # one. The scraper reads an article again as a new event when its title
+    # changes, as an "(Updated October 25)" does.
+    covered = _open_advisory_cves() if cve_match_count else {}
 
     advised = []
     _emit(progress, "create-drafts", "in_progress", "Creating vulnerability advisory draft(s) for CVE-matched events...")
@@ -868,6 +884,11 @@ def run_vea_action(progress=None, days=1, since=None) -> dict:
         if not cves:
             _log(event, "not_relevant", "no CVE found")
             continue
+        if all(cve in covered for cve in cves):
+            _log(event, "not_relevant", "already in an open advisory: "
+                 + ", ".join(f"{cve} in {covered[cve]}" for cve in cves))
+            continue
+        cves = [cve for cve in cves if cve not in covered]
 
         exposure = ""
         if checking_assets:
@@ -941,8 +962,10 @@ def run_vea_action(progress=None, days=1, since=None) -> dict:
             "review_state": misp_store.VEA_REVIEW_DRAFT,
             "source_event_uuid": event.uuid,
             "linked_pir_uuid": "",
+            "analyser_reason": f"The event names {', '.join(cves)}. {exposure}".strip(),
         }
-        misp_store.create_vea(data)
+        _uuid, vea_id = misp_store.create_vea(data)
+        covered.update(dict.fromkeys(cves, vea_id))
         advised.append(event.uuid)
         _log(event, "product_created", f"vea; CVEs: {', '.join(cves)}")
     created = len(advised)

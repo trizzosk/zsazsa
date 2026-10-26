@@ -6,6 +6,11 @@ the requirement's owner and of the stakeholders it is distributed to, and falls
 back, as an alert from the focus points and an advisory do, to the roles of
 everyone the product can reach: its subscribers cleared for its TLP.
 
+Each draft also says why the analyser made it, for the list to show under its
+title: the requirement and the scope items it matched on, or the CVEs. A CVE
+that a draft or an advisory in review already covers gets no second advisory:
+the scraper reads an updated article again as a new event.
+
 One event the model or MISP fails on no longer ends the run: its summary is
 left out, and a briefing relevance check that fails keeps the story, as an
 answer that cannot be read already did.
@@ -52,23 +57,80 @@ class AlertFromARequirement(unittest.TestCase):
                                return_value=(None, [event], {}, {}, {})), \
              mock.patch.object(analyser_pipeline.misp_store, "flash_intel_source_uuids", return_value=set()), \
              mock.patch.object(analyser_pipeline, "requirement_matches",
-                               return_value={event.uuid: [{"id": "PIR-0003", "uuid": "p", "type": "pir"}]}), \
+                               return_value={event.uuid: [{"id": "PIR-0003", "uuid": "p", "type": "pir",
+                                                           "matched_terms": ["Belgium (Geography)", "Bank (Sector)"]},
+                                                          {"id": "GIR-0001", "uuid": "g", "type": "gir",
+                                                           "matched_terms": ["Belgium (Geography)"]}]}), \
              mock.patch.object(analyser_pipeline.req_matching, "get_requirements", return_value=([pir], [])), \
              mock.patch.object(analyser_pipeline.misp_store, "list_stakeholders", return_value=STAKEHOLDERS), \
              mock.patch.object(analyser_pipeline.misp_store, "subscriber_audience", return_value="SOC") as reachable, \
              mock.patch.object(analyser_pipeline.misp_store, "create_fia", side_effect=created.append), \
              mock.patch.object(analyser_pipeline, "_log"):
             analyser_pipeline.run_flash_intel_action()
+        self.reason = created[0]["analyser_reason"]
         return created[0]["audience"], reachable
 
     def test_it_is_for_the_requirement_s_stakeholders(self):
         audience, _reachable = self.alert(SimpleNamespace(uuid="p", owner_uuid="owner", distribution=["ir"]))
         self.assertEqual(audience, "Cyber Threat Intelligence, Incident Response")
 
+    def test_it_says_what_it_matched_on(self):
+        self.alert(SimpleNamespace(uuid="p", owner_uuid="owner", distribution=[]))
+        self.assertEqual(self.reason, "Matches PIR-0003 on Belgium (Geography), Bank (Sector); "
+                                      "GIR-0001 on Belgium (Geography)")
+
     def test_without_their_roles_it_is_for_everyone_it_can_reach(self):
         audience, reachable = self.alert(SimpleNamespace(uuid="p", owner_uuid="", distribution=[]))
         self.assertEqual(audience, "SOC")
         reachable.assert_called_once_with("Flash intel alert", "amber")
+
+
+class AdvisoryForACoveredCve(unittest.TestCase):
+    def run_vea(self, cves_by_title, open_veas=()):
+        events = [SimpleNamespace(uuid=f"{i}" * 36, info=title, tags=[])
+                  for i, title in enumerate(cves_by_title, start=1)]
+        self.created, self.logged = [], []
+
+        def create(data):
+            self.created.append(data)
+            return "u" * 36, f"VEA-0010{len(self.created)}"
+        with mock.patch.object(analyser_pipeline, "_common_candidate_events",
+                               return_value=(None, events, {}, {}, {e.uuid: [] for e in events})), \
+             mock.patch.object(analyser_pipeline.collection_cache, "event_cves",
+                               side_effect=lambda e: cves_by_title[e.info]), \
+             mock.patch.object(analyser_pipeline, "fetch_cve_info", return_value={}), \
+             mock.patch.object(analyser_pipeline.llm, "draft_vea_sections", return_value={}), \
+             mock.patch.object(analyser_pipeline.misp_store, "subscriber_audience", return_value="SOC"), \
+             mock.patch.object(analyser_pipeline.misp_store, "list_veas", return_value=list(open_veas)), \
+             mock.patch.object(analyser_pipeline.misp_store, "create_vea", side_effect=create), \
+             mock.patch.object(analyser_pipeline, "_log",
+                               side_effect=lambda e, outcome, detail=None: self.logged.append((e.info, detail))):
+            return analyser_pipeline.run_vea_action()
+
+    def test_an_updated_article_gets_no_second_advisory(self):
+        """Unit 42 retitled a post "(Updated October 25)", and the PHP CVEs got a second draft."""
+        draft = SimpleNamespace(vea_id="VEA-00589", review_state="draft", cve_id="CVE-2026-109618\nCVE-2026-109619")
+        self.run_vea({"PHP (Updated October 25)": ["CVE-2026-109618", "CVE-2026-109619"]}, [draft])
+        self.assertEqual(self.created, [])
+        self.assertIn(("PHP (Updated October 25)", "already in an open advisory: "
+                       "CVE-2026-109618 in VEA-00589, CVE-2026-109619 in VEA-00589"), self.logged)
+
+    def test_one_already_made_in_the_run_counts_too(self):
+        self.run_vea({"PHP": ["CVE-2026-109618"], "PHP again": ["CVE-2026-109618"]})
+        self.assertEqual([v["title"] for v in self.created], ["PHP"])
+
+    def test_only_its_new_cves_go_in_the_advisory(self):
+        draft = SimpleNamespace(vea_id="VEA-00589", review_state="pending-review", cve_id="CVE-2026-109618")
+        self.run_vea({"PHP and NetScaler": ["CVE-2026-109618", "CVE-2026-88771"]}, [draft])
+        self.assertEqual([(v["cve_id"], v["analyser_reason"]) for v in self.created],
+                         [("CVE-2026-88771", "The event names CVE-2026-88771.")])
+
+    def test_an_approved_or_rejected_advisory_does_not_count(self):
+        """One already sent, or turned down, says nothing about a new article."""
+        done = [SimpleNamespace(vea_id="VEA-00388", review_state=state, cve_id="CVE-2026-110936")
+                for state in ("approved", "rejected")]
+        self.run_vea({"Siemens": ["CVE-2026-110936"]}, done)
+        self.assertEqual([v["cve_id"] for v in self.created], ["CVE-2026-110936"])
 
 
 class OneFailedCall(unittest.TestCase):

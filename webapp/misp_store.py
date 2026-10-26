@@ -673,6 +673,21 @@ def _add_event(misp, event, local_tags=None, label="create event"):
     return result
 
 
+def _source_client(source_id: str):
+    """The MISP a product's source event is on, when it is ours to tag, or None.
+
+    A manual entry, and anything resolve_source_event() found on the webapp
+    store itself, is ours to write to; any other server is not, so its events
+    are left alone. An empty source_id means the scraper, which is where a
+    product stored before the hint was recorded got its events.
+    """
+    if source_id == "webapp" or source_id.startswith("manual-"):
+        return _misp()
+    if source_id and source_id != "scraper":
+        return None
+    return _scraper_misp() if scraper_enabled() else None
+
+
 def _tag_scraper_event_as_product_source(src_uuid: str, product_label: str,
                                           misp_client=None, source_id: str = "") -> None:
     """Tag a source event as having been used to create a product.
@@ -682,27 +697,17 @@ def _tag_scraper_event_as_product_source(src_uuid: str, product_label: str,
     'incomplete') are left at their current workflow state so a finished event
     is not regressed when reused as a source.
 
-    misp_client defaults to the scraper MISP. Pass a different client when the
-    event lives on another MISP instance (configured server or manual source);
-    that is an instruction to tag it there, and source_id is then ignored.
-
-    Without a client, source_id decides which MISP the event is on. A manual
-    entry, and anything resolve_source_event() found on the webapp store itself,
-    is ours to write to; any other server is not, so its events are left alone.
-    An empty source_id means the scraper, which is where a product stored before
-    the hint was recorded got its events.
+    misp_client defaults to the MISP that source_id names (see _source_client).
+    Pass a different client when the event lives on another MISP instance
+    (configured server or manual source); that is an instruction to tag it
+    there, and source_id is then ignored.
     """
     if not src_uuid:
         return
-    if misp_client is None:
-        if source_id == "webapp" or source_id.startswith("manual-"):
-            misp_client = _misp()
-        elif source_id and source_id != "scraper":
-            return
-        elif not scraper_enabled():
-            return
     try:
-        client = misp_client or _scraper_misp()
+        client = misp_client or _source_client(source_id)
+        if client is None:
+            return
         event = client.get_event(src_uuid, pythonify=True)
         # A source is something collected. On the webapp MISP an id from a
         # product form could name one of zsazsa's own records instead.
@@ -734,6 +739,67 @@ def _tag_scraper_event_as_product_source(src_uuid: str, product_label: str,
             logger.debug("Could not patch cache for %s: %s", src_uuid, exc)
     except Exception as exc:
         logger.warning("Could not tag source event %s: %s", src_uuid, exc)
+
+
+def _untag_product_source(src_uuid: str, product_label: str, source_id: str = "") -> None:
+    """Take a product type's tag off a source event no product of that type has.
+
+    Its workflow state stays: an analyst may have set it, or another product.
+    """
+    tag = f'zsazsa:product="{product_label}"'
+    try:
+        client = _source_client(source_id)
+        if client is None:
+            return
+        event = client.get_event(src_uuid, pythonify=True)
+        if not event or isinstance(event, dict) or tag not in {t.name for t in event.tags}:
+            return
+        client.untag(src_uuid, tag)
+        from webapp import collection_cache
+        collection_cache.patch_event_tags(src_uuid, [], [tag])
+    except Exception as exc:
+        logger.warning("Could not untag source event %s: %s", src_uuid, exc)
+
+
+def _retag_product_sources(product_label, before: dict, after: dict, sources_in_use) -> None:
+    """Keep the tags on a product's source events level with its sources.
+
+    ``before`` and ``after`` are its sources before and after a change, as
+    {event UUID: source id}, and ``after`` is empty when it was deleted. A source
+    it no longer has keeps the tag while another product of its type has it:
+    ``sources_in_use`` returns those, and is only asked when one was removed.
+    """
+    for uuid, source_id in after.items():
+        if uuid not in before:
+            _tag_scraper_event_as_product_source(uuid, product_label, source_id=source_id)
+    removed = {uuid: source_id for uuid, source_id in before.items() if uuid not in after}
+    if removed:
+        try:
+            in_use = sources_in_use()
+        except Exception as exc:
+            # The product is already saved or deleted. Keeping a tag too many is
+            # the safe side; the route would otherwise report the change as failed.
+            logger.warning("Could not read which events other %s products have, tags kept: %s", product_label, exc)
+            return
+        for uuid, source_id in removed.items():
+            if uuid not in in_use:
+                _untag_product_source(uuid, product_label, source_id)
+
+
+def _sources_of(record) -> dict:
+    """{source event UUID: source id} of an alert, an advisory or a detection request."""
+    hints = getattr(record, "source_event_hints", None) or {}
+    return {uuid: hints.get(uuid, "") for uuid in record.source_event_uuids}
+
+
+def _briefing_sources(stories) -> dict:
+    """{source event UUID: source id} of a briefing's stories, as dicts or as read back."""
+    sources = {}
+    for story in stories:
+        story = story if isinstance(story, dict) else vars(story)
+        if story.get("source_event_uuid"):
+            sources[story["source_event_uuid"]] = story.get("source_id", "")
+    return sources
 
 
 def _build_obj(name):
@@ -1055,10 +1121,13 @@ def _zsazsa_event(uuid, object_name, tag):
 
 
 def _delete_record(uuid, object_name, tag, label):
-    """Delete a record's event with zsazsa's service key, never any other event."""
-    if _zsazsa_event(uuid, object_name, tag) is None:
+    """Delete a record's event with zsazsa's service key, never any other event,
+    and return it as it was."""
+    event = _zsazsa_event(uuid, object_name, tag)
+    if event is None:
         raise ValueError(f"{label} {uuid} not found")
     _check(_misp().delete_event(uuid), f"delete {label}")
+    return event
 
 
 def _replace_focus_points(req_uuid, focus_points):
@@ -4723,6 +4792,7 @@ def _fia_obj(data):
     _oa_json(obj, "source-event-hints", src_hints)
     _oa_json(obj, "context-tags", data.get("context_tags", []))
     _oa(obj, "linked-pir-uuid", data.get("linked_pir_uuid"))
+    _oa(obj, "analyser-reason", data.get("analyser_reason"))
     _oa(obj, "creator", data.get("creator"))
     _oa(obj, "approved-by", data.get("approved_by"))
     return obj
@@ -4795,6 +4865,7 @@ def _fia_ns(event):
         source_event_uuid=source_event_uuids[0] if source_event_uuids else "",
         context_tags=_json_list(g("context-tags")),
         linked_pir_uuid=g("linked-pir-uuid"),
+        analyser_reason=g("analyser-reason"),
         creator=g("creator"),
         approved_by=g("approved-by"),
         attachments=_fia_attachments(event),
@@ -5143,6 +5214,7 @@ def update_fia(uuid, data):
     event = _zsazsa_event(uuid, "zsazsa-flash-intel", config.TAG_FLASH_INTEL)
     if event is None:
         raise RuntimeError(f"FIA event {uuid} not found")
+    before = _sources_of(_fia_ns(event))
 
     old = _get_obj(event, "zsazsa-flash-intel")
     fia_id = (data.get("fia_id") or (_obj_attr(old, "fia-id") if old else None)
@@ -5156,6 +5228,8 @@ def update_fia(uuid, data):
         data.setdefault("approved_by", _obj_attr(old, "approved-by") or "")
     if old:
         data["creator"] = _obj_attr(old, "creator") or ""
+        # Only the analyser sets it, when it makes the draft.
+        data["analyser_reason"] = _obj_attr(old, "analyser-reason") or ""
     _sync_object_attributes(misp, event, "zsazsa-flash-intel", _fia_obj(data), "FIA")
 
     title = (data.get("title") or "").strip() or "Untitled"
@@ -5195,6 +5269,7 @@ def update_fia(uuid, data):
     _delete_fia_reports(misp, refreshed)
     fia = _fia_ns(refreshed)
     _write_fia_report(misp, uuid, fia_id, render_fia_markdown(fia, fia_id))
+    _retag_product_sources("flash-intel", before, _sources_of(fia), flash_intel_source_uuids)
     return uuid, fia_id
 
 
@@ -5285,7 +5360,8 @@ def reject_fia(uuid, reason=""):
 
 
 def delete_fia(uuid):
-    _delete_record(uuid, "zsazsa-flash-intel", config.TAG_FLASH_INTEL, "FIA")
+    fia = _fia_ns(_delete_record(uuid, "zsazsa-flash-intel", config.TAG_FLASH_INTEL, "FIA"))
+    _retag_product_sources("flash-intel", _sources_of(fia), {}, flash_intel_source_uuids)
 
 
 # ── Flash intel attachments ──────────────────────────────────────────────────
@@ -5758,6 +5834,7 @@ def _vea_obj(data):
     _oa_json(obj, "source-event-hints", src_hints)
     _oa(obj, "linked-pir-uuid", data.get("linked_pir_uuid"))
     _oa_json(obj, "context-tags", data.get("context_tags", []))
+    _oa(obj, "analyser-reason", data.get("analyser_reason"))
     _oa(obj, "creator", data.get("creator"))
     _oa(obj, "approved-by", data.get("approved_by"))
     return obj
@@ -5775,7 +5852,7 @@ _VEA_FIELDS = (
     "patch_sla_internal", "target_patch_version", "exploitation_indicators",
     "detection_rules", "references", "feedback_deadline", "review_state",
     "rejection_reason", "source_event_uuids", "source_event_hints",
-    "linked_pir_uuid", "context_tags", "creator", "approved_by",
+    "linked_pir_uuid", "context_tags", "analyser_reason", "creator", "approved_by",
 )
 
 
@@ -5836,6 +5913,7 @@ def _vea_ns(event):
         source_event_uuid=source_event_uuids[0] if source_event_uuids else "",
         linked_pir_uuid=g("linked-pir-uuid"),
         context_tags=_json_list(g("context-tags")),
+        analyser_reason=g("analyser-reason"),
         creator=g("creator"),
         approved_by=g("approved-by"),
         published=bool(getattr(event, "published", False)),
@@ -5984,6 +6062,10 @@ def _write_vea_report(misp, event_uuid, vea_id, content):
     _check(misp.add_event_report(event_uuid, er), "add VEA report")
 
 
+def _vea_source_uuids() -> set:
+    return {uuid for vea in list_veas() for uuid in vea.source_event_uuids}
+
+
 def list_veas(review_state=None):
     misp = _misp()
     events = _search_all(misp, tags=[config.TAG_VEA], pythonify=True)
@@ -6046,6 +6128,7 @@ def update_vea(uuid, data):
     event = _zsazsa_event(uuid, "zsazsa-vea", config.TAG_VEA)
     if event is None:
         raise RuntimeError(f"VEA event {uuid} not found")
+    before = _sources_of(_vea_ns(event))
 
     old = _get_obj(event, "zsazsa-vea")
     vea_id = (data.get("vea_id") or (_obj_attr(old, "vea-id") if old else None)
@@ -6059,6 +6142,8 @@ def update_vea(uuid, data):
         data.setdefault("approved_by", _obj_attr(old, "approved-by") or "")
     if old:
         data["creator"] = _obj_attr(old, "creator") or ""
+        # Only the analyser sets it, when it makes the draft.
+        data["analyser_reason"] = _obj_attr(old, "analyser-reason") or ""
     _sync_object_attributes(misp, event, "zsazsa-vea", _vea_obj(data), "VEA")
 
     cve = (data.get("cve_id") or "").strip()
@@ -6070,6 +6155,7 @@ def update_vea(uuid, data):
     _delete_vea_reports(misp, refreshed)
     vea = _vea_ns(refreshed)
     _write_vea_report(misp, uuid, vea_id, render_vea_markdown(vea, vea_id))
+    _retag_product_sources("vea", before, _sources_of(vea), _vea_source_uuids)
     return uuid, vea_id
 
 
@@ -6117,7 +6203,8 @@ def reject_vea(uuid, reason=""):
 
 
 def delete_vea(uuid):
-    _delete_record(uuid, "zsazsa-vea", config.TAG_VEA, "VEA")
+    vea = _vea_ns(_delete_record(uuid, "zsazsa-vea", config.TAG_VEA, "VEA"))
+    _retag_product_sources("vea", _sources_of(vea), {}, _vea_source_uuids)
 
 
 # ── Detection Engineering Request ────────────────────────────────────────────
@@ -6363,6 +6450,10 @@ def _write_der_report(misp, event_uuid, der_id, content):
     _check(misp.add_event_report(event_uuid, er), "add DER report")
 
 
+def _der_source_uuids() -> set:
+    return {uuid for der in list_ders() for uuid in der.source_event_uuids}
+
+
 def list_ders():
     misp = _misp()
     events = _search_all(misp, tags=[config.TAG_DETECTION_ENG], pythonify=True)
@@ -6411,10 +6502,7 @@ def create_der(data):
     der.der_id = der_id
     _write_der_report(misp, uuid, der_id, render_der_markdown(der, der_id))
     for uid in src_uuids:
-        source_id = src_hints.get(uid, "")
-        if source_id and source_id != "scraper":
-            continue
-        _tag_scraper_event_as_product_source(uid, "detection-eng-request")
+        _tag_scraper_event_as_product_source(uid, "detection-eng-request", source_id=src_hints.get(uid, ""))
     return uuid, der_id
 
 
@@ -6423,6 +6511,7 @@ def update_der(uuid, data):
     event = _zsazsa_event(uuid, "zsazsa-detection-eng-request", config.TAG_DETECTION_ENG)
     if event is None:
         raise RuntimeError(f"DER event {uuid} not found")
+    before = _sources_of(_der_ns(event))
 
     old = _get_obj(event, "zsazsa-detection-eng-request")
     der_id = (data.get("der_id") or (_obj_attr(old, "der-id") if old else None)
@@ -6446,6 +6535,7 @@ def update_der(uuid, data):
     _delete_der_reports(misp, refreshed)
     der = _der_ns(refreshed)
     _write_der_report(misp, uuid, der_id, render_der_markdown(der, der_id))
+    _retag_product_sources("detection-eng-request", before, _sources_of(der), _der_source_uuids)
     return uuid, der_id
 
 
@@ -6494,7 +6584,8 @@ def reject_der(uuid, reason=""):
 
 
 def delete_der(uuid):
-    _delete_record(uuid, "zsazsa-detection-eng-request", config.TAG_DETECTION_ENG, "DER")
+    der = _der_ns(_delete_record(uuid, "zsazsa-detection-eng-request", config.TAG_DETECTION_ENG, "DER"))
+    _retag_product_sources("detection-eng-request", _sources_of(der), {}, _der_source_uuids)
 
 
 # ── Daily Threat Briefing ────────────────────────────────────────────────────
@@ -6927,6 +7018,10 @@ def _write_briefing_report(misp, event_uuid, briefing):
     _check(misp.add_event_report(event_uuid, er), "add briefing report")
 
 
+def _briefing_source_uuids() -> set:
+    return {uuid for briefing in list_briefings() for uuid in _briefing_sources(briefing.stories)}
+
+
 def list_briefings():
     misp = _misp()
     events = _search_all(misp, tags=[config.TAG_BRIEFING], pythonify=True)
@@ -7013,17 +7108,6 @@ def _update_briefing(uuid, data, expected_state):
     if expected_state is not None and existing.review_state != expected_state:
         raise BriefingStateChanged(
             f"Briefing {uuid} is {existing.review_state or 'unset'} now, not {expected_state}")
-    existing_sources = {
-        getattr(s, "source_event_uuid", "") for s in existing.stories
-        if getattr(s, "source_event_uuid", "")
-    }
-    # uuid -> source_id, so the marker tag goes to the MISP instance the story
-    # was actually collected from.
-    added_sources = {}
-    for story in data.get("stories", []):
-        src = story.get("source_event_uuid", "")
-        if src and src not in existing_sources:
-            added_sources[src] = story.get("source_id", "")
 
     old = _get_obj(event, "zsazsa-daily-briefing")
     if old:
@@ -7039,10 +7123,9 @@ def _update_briefing(uuid, data, expected_state):
     briefing = _briefing_ns(refreshed)
     _write_briefing_report(misp, uuid, briefing)
 
-    for src, source_id in added_sources.items():
-        _tag_scraper_event_as_product_source(
-            src, "daily-briefing", source_id=source_id)
-
+    # Each story's source_id, so the tag goes to the MISP the story was collected from.
+    _retag_product_sources("daily-briefing", _briefing_sources(existing.stories),
+                           _briefing_sources(data.get("stories", [])), _briefing_source_uuids)
     return uuid
 
 
@@ -7081,7 +7164,8 @@ def _publish_briefing(uuid):
 
 
 def delete_briefing(uuid):
-    _delete_record(uuid, "zsazsa-daily-briefing", config.TAG_BRIEFING, "briefing")
+    briefing = _briefing_ns(_delete_record(uuid, "zsazsa-daily-briefing", config.TAG_BRIEFING, "briefing"))
+    _retag_product_sources("daily-briefing", _briefing_sources(briefing.stories), {}, _briefing_source_uuids)
 
 
 def scraper_existing_uuids(uuids):
