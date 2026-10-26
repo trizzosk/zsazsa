@@ -83,7 +83,7 @@
                   <i class="fas fa-eye"></i>
                 </button>
                 <button type="button" class="btn btn-xs btn-outline-secondary feedback-btn"
-                        data-uuid="{{ b.uuid }}" data-label="Briefing {{ b.date or b.uuid }}"
+                        data-action="{{ url_for('daily_briefing.add_feedback', id=b.uuid) }}" data-label="Briefing {{ b.date or b.uuid }}"
                         data-bs-toggle="modal" data-bs-target="#feedback-modal" title="Give feedback">
                   <i class="fas fa-comment-dots"></i>
                 </button>
@@ -274,10 +274,9 @@ document.querySelectorAll('.preview-toggle-btn').forEach(function(btn) {
 /* ── Feedback modal ── */
 document.querySelectorAll('.feedback-btn').forEach(function(btn) {
   btn.addEventListener('click', function() {
-    var uuid = btn.dataset.uuid;
     var label = btn.dataset.label || '';
     document.getElementById('feedback-modal-label').textContent = label;
-    document.getElementById('feedback-form').action = '/briefing/' + uuid + '/feedback';
+    document.getElementById('feedback-form').action = btn.dataset.action;
   });
 });
 </script>

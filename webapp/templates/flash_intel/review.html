@@ -97,7 +97,7 @@
                   <i class="fas fa-eye"></i>
                 </button>
                 <button type="button" class="btn btn-xs btn-outline-secondary feedback-btn"
-                        data-uuid="{{ f.uuid }}" data-fia-id="{{ f.fia_id }}"
+                        data-action="{{ url_for('flash_intel.add_feedback', id=f.uuid) }}" data-fia-id="{{ f.fia_id }}"
                         data-bs-toggle="modal" data-bs-target="#feedback-modal" title="Give feedback">
                   <i class="fas fa-comment-dots"></i>
                 </button>
@@ -402,10 +402,9 @@
     feedbackModal.addEventListener('show.bs.modal', function(e) {
       var trigger = e.relatedTarget;
       if (!trigger) return;
-      var uuid = trigger.getAttribute('data-uuid');
       var fiaId = trigger.getAttribute('data-fia-id');
       document.getElementById('feedback-fia-id').textContent = fiaId || '';
-      document.getElementById('feedback-form').action = '/products/flash-intel/' + uuid + '/feedback';
+      document.getElementById('feedback-form').action = trigger.dataset.action;
     });
     feedbackModal.addEventListener('hidden.bs.modal', function() {
       feedbackModal.querySelector('form').reset();

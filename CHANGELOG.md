@@ -50,6 +50,7 @@
 
 ### Fixed
 
+- Feedback from the threat actor profile, flash intel alert, vulnerability advisory, detection engineering request and daily briefing lists keeps the application's mount path, such as `/zsazsa`, instead of submitting outside it.
 - The settings pages refused site admins when `MISP_WEBAPP_KEY` was not a site admin's key (#71). The role is now asked with the user's own session.
 - With single sign-on, a short MISP `Session.timeout` or `Session.autoRegenerate` could end the session while working in zsazsa.
 - Changing the review state of a vulnerability advisory deleted its summary, CVSS, CWE and context tags (#69). Its mail and MISP report now have the summary, CVSS and CWE.

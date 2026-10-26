@@ -111,7 +111,7 @@
                   <i class="fas fa-eye"></i>
                 </button>
                 <button type="button" class="btn btn-xs btn-outline-secondary feedback-btn"
-                        data-uuid="{{ v.uuid }}" data-vea-id="{{ v.vea_id }}"
+                        data-action="{{ url_for('vea.add_feedback', id=v.uuid) }}" data-vea-id="{{ v.vea_id }}"
                         data-bs-toggle="modal" data-bs-target="#feedback-modal" title="Give feedback">
                   <i class="fas fa-comment-dots"></i>
                 </button>
@@ -319,9 +319,8 @@
     feedbackModal.addEventListener('show.bs.modal', function(e) {
       var trigger = e.relatedTarget;
       if (!trigger) return;
-      var uuid = trigger.getAttribute('data-uuid');
       document.getElementById('feedback-product-id').textContent = trigger.getAttribute('data-vea-id') || '';
-      document.getElementById('feedback-form').action = '/products/vea/' + uuid + '/feedback';
+      document.getElementById('feedback-form').action = trigger.dataset.action;
     });
     feedbackModal.addEventListener('hidden.bs.modal', function() {
       feedbackModal.querySelector('form').reset();
