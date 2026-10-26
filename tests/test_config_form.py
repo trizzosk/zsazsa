@@ -258,6 +258,35 @@ class ConfigSave(unittest.TestCase):
             self.client.post("/config", data={})
         self.assertEqual(self.saved()["MISP_SERVERS"], [server])
 
+    def save_smtp(self, **posted):
+        stored = {"SMTP_HOST": "smtp.example.org", "SMTP_PASSWORD": "stored-password", "SMTP_FROM": "cti@example.org"}
+        body = {"host": "smtp.example.org", "port": "587", "use_tls": True, "username": "cti",
+                "password": "", "from": "cti@example.org", "sender_name": "CTI team", **posted}
+        with mock.patch.multiple(_config, create=True, **stored):
+            return self.client.post("/config/save-smtp", json=body)
+
+    def test_the_smtp_server_is_saved_from_its_own_card(self):
+        """The card had no button of its own, and a From typed into it was lost
+        when the page was left without Save configuration."""
+        before = self.saved()
+        self.assertTrue(self.save_smtp(**{"from": "alerts@example.org"}).get_json()["ok"])
+        after = self.saved()
+        self.assertEqual((after["SMTP_FROM"], after["SMTP_SENDER_NAME"], after["SMTP_PASSWORD"]),
+                         ("alerts@example.org", "CTI team", "stored-password"))
+        self.assertEqual(after["MISP_WEBAPP_KEY"], before["MISP_WEBAPP_KEY"])
+
+    def test_an_smtp_host_without_a_from_address_is_refused(self):
+        before = self.saved()
+        answer = self.save_smtp(**{"from": ""})
+        self.assertEqual(answer.status_code, 400)
+        self.assertIn("From address", answer.get_json()["error"])
+        self.assertEqual(self.saved(), before)
+
+    def test_the_smtp_password_follows_the_host(self):
+        self.assertEqual(self.save_smtp(host="smtp.elsewhere.example").status_code, 400)
+        self.save_smtp(remove_password=True)
+        self.assertEqual(self.saved()["SMTP_PASSWORD"], "")
+
 
 if __name__ == "__main__":
     unittest.main()

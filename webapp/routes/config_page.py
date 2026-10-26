@@ -447,6 +447,9 @@ def _reenter_message(what) -> str:
     return f"Enter the {what} again: its address changed, and the stored one is only used for the old address."
 
 
+_SMTP_FROM_MISSING = "Enter the From address: no mail goes out through the SMTP host without one."
+
+
 def _write(values):
     shutil.copy2(str(_CONFIG_FILE), str(_BACKUP_FILE))
     products = values["PRODUCT_TYPES"]
@@ -943,6 +946,11 @@ def index():
             if values[key] is None:
                 flash(_reenter_message(what), "warning")
                 return redirect(refused)
+        # Only the setup wizard posts the SMTP settings here: the Notifications
+        # tab saves them with their own button.
+        if "SMTP_FROM" in request.form and values["SMTP_HOST"] and not values["SMTP_FROM"]:
+            flash(_SMTP_FROM_MISSING, "warning")
+            return redirect(refused)
         try:
             _write(values)
             importlib.reload(_config)
@@ -1778,6 +1786,46 @@ def test_flowintel_connection():
     if not url or not api_key:
         return jsonify({"ok": False, "error": "URL and API key are required"}), 400
     return jsonify(flowintel_client.test_connection(url, api_key, verify_tls))
+
+
+@bp.route("/config/save-smtp", methods=["POST"])
+@rate_limited("config_save_smtp", limit=20, window_s=60)
+def save_smtp():
+    """Save the SMTP server the email channels send through (AJAX)."""
+    data, err = _json_object()
+    if err:
+        return err
+    host = (data.get("host") or "").strip()
+    sender = (data.get("from") or "").strip()
+    if host and not sender:
+        return jsonify({"ok": False, "error": _SMTP_FROM_MISSING}), 400
+    try:
+        port = int(data.get("port") or 587)
+        use_tls = _parse_bool(data.get("use_tls", True), default=True)
+    except ValueError:
+        return jsonify({"ok": False, "error": "Port must be a number"}), 400
+    current = _read()
+    password = "" if data.get("remove_password") else _kept_secret(
+        (data.get("password") or "").strip(), current["SMTP_PASSWORD"], host, current["SMTP_HOST"])
+    if password is None:
+        return jsonify({"ok": False, "error": _reenter_message("SMTP password")}), 400
+    current.update({
+        "SMTP_HOST": host,
+        "SMTP_PORT": port,
+        "SMTP_USE_TLS": use_tls,
+        "SMTP_USERNAME": (data.get("username") or "").strip(),
+        "SMTP_PASSWORD": password,
+        "SMTP_FROM": sender,
+        "SMTP_SENDER_NAME": (data.get("sender_name") or "").strip(),
+    })
+    try:
+        _write(current)
+        importlib.reload(_config)
+        audit.record("update", "config", details="SMTP server saved")
+        return jsonify({"ok": True})
+    except Exception:
+        logger.exception("save_smtp failed")
+        return jsonify({"ok": False, "error": "Could not save the SMTP settings."}), 500
 
 
 @bp.route("/config/test-smtp-connection", methods=["POST"])

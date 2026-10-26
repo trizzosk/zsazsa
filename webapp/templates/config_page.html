@@ -1365,48 +1365,50 @@
           <div class="row g-3">
             <div class="col-sm-8">
               <label class="form-label">SMTP host</label>
-              <input type="text" name="SMTP_HOST" class="form-control font-monospace" value="{{ cfg.SMTP_HOST }}" placeholder="smtp.gmail.com">
+              <input type="text" id="smtp-host" class="form-control font-monospace" value="{{ cfg.SMTP_HOST }}" placeholder="smtp.gmail.com">
             </div>
             <div class="col-sm-4">
               <label class="form-label">Port</label>
-              <input type="number" name="SMTP_PORT" class="form-control" value="{{ cfg.SMTP_PORT }}" min="1" max="65535">
+              <input type="number" id="smtp-port" class="form-control" value="{{ cfg.SMTP_PORT }}" min="1" max="65535">
             </div>
             <div class="col-sm-6">
               <label class="form-label">Username</label>
-              <input type="text" name="SMTP_USERNAME" class="form-control font-monospace" value="{{ cfg.SMTP_USERNAME }}" placeholder="account@gmail.com">
+              <input type="text" id="smtp-username" class="form-control font-monospace" value="{{ cfg.SMTP_USERNAME }}" placeholder="account@gmail.com">
             </div>
             <div class="col-sm-6">
               <label class="form-label">Password</label>
               <div class="input-group">
-                <input type="password" name="SMTP_PASSWORD" class="form-control font-monospace api-key-input"
+                <input type="password" id="smtp-password" class="form-control font-monospace api-key-input"
                        placeholder="{{ 'Configured, leave blank to keep' if cfg.SMTP_PASSWORD }}" autocomplete="new-password">
                 <button class="btn btn-outline-secondary api-key-toggle" type="button" title="Show/hide"><i class="fas fa-eye"></i></button>
               </div>
               {% if cfg.SMTP_PASSWORD %}{{ remove_secret('SMTP_PASSWORD', 'Remove the stored password') }}{% endif %}
             </div>
             <div class="col-sm-4">
-              <label class="form-label">From address</label>
-              <input type="text" name="SMTP_FROM" class="form-control font-monospace" value="{{ cfg.SMTP_FROM }}" placeholder="account@gmail.com">
+              <label class="form-label">From address <span class="text-danger">*</span></label>
+              <input type="text" id="smtp-from" class="form-control font-monospace{{ ' is-invalid' if cfg.SMTP_HOST and not cfg.SMTP_FROM }}"
+                     value="{{ cfg.SMTP_FROM }}" placeholder="account@gmail.com">
+              {% if cfg.SMTP_HOST and not cfg.SMTP_FROM %}<div class="invalid-feedback">Required: no mail is sent without it.</div>{% endif %}
             </div>
             <div class="col-sm-4">
               <label class="form-label">Sender name <span class="text-muted">(optional)</span></label>
-              <input type="text" name="SMTP_SENDER_NAME" class="form-control" value="{{ cfg.SMTP_SENDER_NAME }}" placeholder="CTI team">
+              <input type="text" id="smtp-sender-name" class="form-control" value="{{ cfg.SMTP_SENDER_NAME }}" placeholder="CTI team">
             </div>
             <div class="col-sm-4">
               <div class="form-check form-switch mt-4">
-                <input class="form-check-input" type="checkbox" name="SMTP_USE_TLS" id="smtp_use_tls" value="true" {{ 'checked' if cfg.SMTP_USE_TLS }}>
-                <input type="hidden" name="SMTP_USE_TLS" value="false">
-                <label class="form-check-label" for="smtp_use_tls">Use STARTTLS</label>
+                <input class="form-check-input" type="checkbox" id="smtp-use-tls" {{ 'checked' if cfg.SMTP_USE_TLS }}>
+                <label class="form-check-label" for="smtp-use-tls">Use STARTTLS</label>
               </div>
             </div>
           </div>
           <div class="d-flex gap-2 mt-3 align-items-center">
+            <button type="button" class="btn btn-sm btn-primary" id="save-smtp-btn">Save</button>
             <button type="button" class="btn btn-sm btn-outline-secondary" id="test-smtp-btn">
               <i class="fas fa-plug me-1"></i>Test connection
             </button>
-            <span class="small" id="test-smtp-result"></span>
+            <span class="small" id="smtp-result"></span>
           </div>
-          <div class="form-text mt-2">SMTP settings are saved with <strong>Save configuration</strong> at the top of this tab. The test uses the values entered above, even before saving.</div>
+          <div class="form-text mt-2">The test uses the values entered above, even before saving.</div>
         </div>
       </div>
 
@@ -2204,41 +2206,69 @@
   document.querySelectorAll('.chat-channel-section').forEach(bindSection);
 })();
 
-// ── SMTP test connection ──────────────────────────────────────────────────────
+// ── SMTP server ───────────────────────────────────────────────────────────────
 (function () {
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-  const btn = document.getElementById('test-smtp-btn');
-  const resultEl = document.getElementById('test-smtp-result');
-  if (!btn || !resultEl) return;
+  const testBtn = document.getElementById('test-smtp-btn');
+  const saveBtn = document.getElementById('save-smtp-btn');
+  const resultEl = document.getElementById('smtp-result');
+  if (!testBtn || !saveBtn || !resultEl) return;
+  const value = (id) => document.getElementById(id).value.trim();
 
-  btn.addEventListener('click', async () => {
-    const field = (name) => document.querySelector(`[name="${name}"]`);
-    btn.disabled = true;
-    resultEl.textContent = 'Testing…';
-    resultEl.className = 'small text-muted';
-    let data;
+  function show(text, style) {
+    resultEl.textContent = text;
+    resultEl.className = 'small ' + style;
+  }
+
+  function server() {
+    return {
+      host: value('smtp-host'),
+      port: value('smtp-port'),
+      use_tls: document.getElementById('smtp-use-tls').checked,
+      username: value('smtp-username'),
+      password: document.getElementById('smtp-password').value,
+    };
+  }
+
+  async function post(button, path, body) {
+    button.disabled = true;
     try {
-      const resp = await fetch(SCRIPT_ROOT + '/config/test-smtp-connection', {
+      const resp = await fetch(SCRIPT_ROOT + path, {
         method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
-        body: JSON.stringify({
-          host: field('SMTP_HOST').value.trim(),
-          port: field('SMTP_PORT').value.trim(),
-          use_tls: document.getElementById('smtp_use_tls').checked,
-          username: field('SMTP_USERNAME').value.trim(),
-          password: field('SMTP_PASSWORD').value,
-        }),
+        body: JSON.stringify(body),
       });
-      data = await resp.json();
+      return await resp.json();
     } catch (e) {
-      data = {ok: false, error: 'Request failed'};
+      return {ok: false, error: 'Request failed'};
+    } finally {
+      button.disabled = false;
     }
-    btn.disabled = false;
+  }
+
+  testBtn.addEventListener('click', async () => {
+    show('Testing…', 'text-muted');
+    const data = await post(testBtn, '/config/test-smtp-connection', server());
+    show(data.ok ? 'Connection OK' : (data.error || 'Failed'), data.ok ? 'text-success' : 'text-danger');
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const fromField = document.getElementById('smtp-from');
+    if (value('smtp-host') && !value('smtp-from')) {
+      fromField.classList.add('is-invalid');
+      show('Enter the From address: no mail goes out without one.', 'text-danger');
+      return;
+    }
+    const data = await post(saveBtn, '/config/save-smtp', {
+      ...server(),
+      from: value('smtp-from'),
+      sender_name: value('smtp-sender-name'),
+      remove_password: document.getElementById('remove-SMTP_PASSWORD')?.checked || false,
+    });
     if (data.ok) {
-      resultEl.textContent = 'Connection OK';
-      resultEl.className = 'small text-success';
+      fromField.classList.remove('is-invalid');
+      show('Saved', 'text-success');
     } else {
-      resultEl.textContent = data.error || 'Failed';
-      resultEl.className = 'small text-danger';
+      show(data.error || 'Save failed', 'text-danger');
     }
   });
 })();

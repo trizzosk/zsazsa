@@ -19,6 +19,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from bs4 import BeautifulSoup
 from flask import render_template
 
 import config as _config
@@ -215,6 +216,30 @@ class SetupWizard(unittest.TestCase):
         self.configured(SMTP_HOST="smtp.old.example", SMTP_PASSWORD="smtp-secret")
         before = self.target.read_text()
         resp = self.post_step("notifications", SMTP_HOST="smtp.new.example")
+        self.assertTrue(resp.headers["Location"].endswith("/config/setup/notifications"))
+        self.assertEqual(self.target.read_text(), before)
+
+    def test_the_mail_server_form_saves_its_sender_address(self):
+        """Filled in and submitted as a browser does, from the step's own form."""
+        self.configured(SMTP_HOST="", SMTP_PASSWORD="", SMTP_FROM="")
+        page = BeautifulSoup(self.client.get("/config/setup/notifications").data, "html.parser")
+        form = page.find("input", {"name": "wizard_step"}).find_parent("form")
+        data = {}
+        for field in form.find_all("input"):
+            if field.get("name") and (field.get("type") != "checkbox" or field.has_attr("checked")):
+                data.setdefault(field["name"], field.get("value", ""))
+        data.update(SMTP_HOST="smtp.gmail.com", SMTP_USERNAME="cti@example.org", SMTP_PASSWORD="app-password",
+                    SMTP_FROM="cti@example.org")
+        self.client.post(form["action"], data=data)
+        saved = _keyvals(self.target)
+        self.assertEqual((saved["SMTP_HOST"], saved["SMTP_FROM"], saved["SMTP_PASSWORD"]),
+                         ("smtp.gmail.com", "cti@example.org", "app-password"))
+
+    def test_a_mail_server_without_a_from_address_is_refused(self):
+        """Every mail through it failed with "SMTP not configured (host/from missing)"."""
+        self.configured(SMTP_HOST="smtp.example.org", SMTP_PASSWORD="", SMTP_FROM="cti@example.org")
+        before = self.target.read_text()
+        resp = self.post_step("notifications", SMTP_HOST="smtp.example.org", SMTP_FROM="")
         self.assertTrue(resp.headers["Location"].endswith("/config/setup/notifications"))
         self.assertEqual(self.target.read_text(), before)
 
