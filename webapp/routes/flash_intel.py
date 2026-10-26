@@ -200,6 +200,7 @@ def review():
         audience_choices=STAKEHOLDER_ROLES,
         tlp_counts=tlp_counts(matching(all_fias, tests, skip="tlp")),
         audience_counts=misp_store.audience_counts(matching(all_fias, tests, skip="audience")),
+        can_publish=misp_session.current_user_can_publish(),
         sort=sort,
         dir=direction,
     )
@@ -337,18 +338,20 @@ def wizard_edit(id):
 
 @bp.route("/<string:id>/approve", methods=["POST"])
 def approve(id):
+    return_url = (url_for("flash_intel.review") if request.form.get("return_to") == "review"
+                  else url_for("flash_intel.detail", id=id))
     fia = misp_store.get_fia(id)
     if fia is None:
         return "FIA not found", 404
     if fia.review_state == misp_store.FIA_REVIEW_APPROVED:
         flash(f"{fia.fia_id} is already published. Resend delivers it again.", "warning")
-        return redirect(url_for("flash_intel.detail", id=id))
+        return redirect(return_url)
     if not (fia.audience or "").strip():
         flash("A target audience is required before publishing. Edit the alert and select an audience first.", "warning")
-        return redirect(url_for("flash_intel.detail", id=id))
+        return redirect(return_url)
     if not misp_session.current_user_can_publish():
         flash(misp_session.publish_denied_message("approve and publish"), "warning")
-        return redirect(url_for("flash_intel.detail", id=id))
+        return redirect(return_url)
     try:
         in_misp = misp_store.publish_fia(id)
         audit.record("publish", "fia", entity_id=id, entity_label=fia.fia_id)
@@ -359,7 +362,7 @@ def approve(id):
         flash("Notifications are being sent in the background; the job badge reports the result.", "info")
     except Exception as exc:
         flash(f"Could not publish FIA: {exc}", "warning")
-    return redirect(url_for("flash_intel.detail", id=id))
+    return redirect(return_url)
 
 
 @bp.route("/<string:id>/reject", methods=["POST"])

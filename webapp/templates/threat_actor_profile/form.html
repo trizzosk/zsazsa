@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_product_actions.html" import draft_actions %}
 {% from "_macros.html" import galaxy_multiselect, tag_input %}
 
 {% set is_edit = tap is not none %}
@@ -300,10 +301,10 @@
             </div>
             {% endfor %}
           </div>
-          <div id="tap-audience-warn" class="text-danger small mt-1" style="display:none;">
+          <div id="tap-audience-warn" class="text-danger small mt-1" style="{{ 'display:none;' if current_audiences else '' }}">
             <i class="fas fa-triangle-exclamation me-1"></i>Select at least one audience.
           </div>
-          <div class="form-text">Corresponds to the stakeholder <strong>role</strong>. Select all that apply.</div>
+          <div class="form-text">Corresponds to the stakeholder <strong>role</strong>. Select at least one audience, which is required before this can be approved and published.</div>
         </div>
         <div class="mb-3">
           <label class="form-label">TLP</label>
@@ -379,19 +380,7 @@
       </div>
     </div>
 
-    <div class="d-grid gap-2">
-      <button type="submit" class="btn btn-primary" id="tap-submit">
-        <i class="fas fa-floppy-disk me-1"></i>Save draft
-      </button>
-      {% if not is_edit %}
-      <button type="button" class="btn btn-outline-secondary" id="tap-recipients-btn"
-              data-bs-toggle="modal" data-bs-target="#recipientsModal">
-        <i class="fas fa-users me-1"></i> Recipients
-      </button>
-      {% endif %}
-      <a href="{{ url_for('threat_actor_profile.detail', id=tap.uuid) if is_edit else url_for('threat_actor_profile.review') }}"
-         class="btn btn-outline-secondary">Cancel</a>
-    </div>
+    {{ draft_actions(url_for('threat_actor_profile.detail', id=tap.uuid) if is_edit else url_for('threat_actor_profile.review'), 'tap-submit') }}
 
   </div>
 
@@ -409,25 +398,6 @@
 </div>
 {% endif %}
 
-{% if not is_edit %}
-{# Recipients preview (computed live from the current audience + TLP) #}
-<div class="modal fade" id="recipientsModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title"><i class="fas fa-users me-2"></i>Who would receive this profile?</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body" id="recipients-body">
-        <p class="text-muted mb-0">Loading…</p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
-{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -713,33 +683,10 @@ zsazsaBindRulezetAttackLookup({
   });
   document.querySelectorAll('.tap-audience').forEach(function(cb) {
     cb.addEventListener('change', function() {
-      if (audienceChecked()) warn.style.display = 'none';
+      warn.style.display = audienceChecked() ? 'none' : '';
     });
   });
 
-  // Live recipients preview based on the currently selected audience + TLP.
-  // The button only exists on the new-profile form (hidden on edit, like FIA).
-  var recipientsBtn = document.getElementById('tap-recipients-btn');
-  if (recipientsBtn) {
-    var token = document.querySelector('meta[name="csrf-token"]').content;
-    recipientsBtn.addEventListener('click', function() {
-      var body = document.getElementById('recipients-body');
-      body.innerHTML = '<p class="text-muted mb-0">Loading…</p>';
-      var fd = new FormData();
-      fd.append('tlp', form.querySelector('[name="tlp"]').value);
-      document.querySelectorAll('.tap-audience:checked').forEach(function(cb) {
-        fd.append('audience', cb.value);
-      });
-      fetch('{{ url_for("threat_actor_profile.recipients_preview") }}', {
-        method: 'POST',
-        headers: { 'X-CSRF-Token': token },
-        body: fd
-      })
-      .then(function(r) { return r.text(); })
-      .then(function(html) { body.innerHTML = html; })
-      .catch(function() { body.innerHTML = '<p class="text-danger mb-0">Could not load recipients.</p>'; });
-    });
-  }
 })();
 </script>
 {% endblock %}

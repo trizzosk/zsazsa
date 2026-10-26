@@ -1,0 +1,37 @@
+{% macro draft_actions(cancel_url, save_id, submit_id=None) %}
+<div class="zs-actions d-grid gap-2">
+  {% if submit_id %}
+  <button type="submit" name="action" value="submit" class="btn btn-primary" id="{{ submit_id }}">
+    <i class="fas fa-paper-plane me-1" aria-hidden="true"></i> Submit for review
+  </button>
+  {% endif %}
+  <button type="submit" name="action" value="save" class="btn btn-outline-secondary" id="{{ save_id }}">
+    <i class="fas fa-floppy-disk me-1" aria-hidden="true"></i> Save draft
+  </button>
+  <a href="{{ cancel_url }}" class="btn btn-outline-secondary">
+    <i class="fas fa-xmark me-1" aria-hidden="true"></i> Cancel
+  </a>
+</div>
+{% endmacro %}
+
+{% macro preview_button(target, approvable=False) %}
+<button type="button" class="btn btn-xs btn-outline-{{ 'success' if approvable else 'secondary' }} preview-toggle-btn"
+        data-target="{{ target }}" aria-controls="{{ target }}" aria-expanded="false"
+        data-preview-icon="{{ 'fa-clipboard-check' if approvable else 'fa-eye' }}"
+        title="{{ 'Preview and approve' if approvable else 'Preview' }}">
+  <i class="fas fa-fw {{ 'fa-clipboard-check' if approvable else 'fa-eye' }}" aria-hidden="true"></i>
+</button>
+{% endmacro %}
+
+{% macro approval_form(action, can_publish, has_audience=True) %}
+<form method="post" action="{{ action }}" class="inline-approval-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="return_to" value="review">
+  <button type="submit" class="btn btn-xs btn-success text-nowrap"
+          {% if not can_publish %}disabled title="Only users with MISP publish rights can approve and publish."
+          {% elif not has_audience %}disabled title="Select a target audience on the edit form before publishing."
+          {% endif %}>
+    <i class="fas fa-check me-1" aria-hidden="true"></i>Approve &amp; publish
+  </button>
+</form>
+{% endmacro %}

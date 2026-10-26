@@ -186,6 +186,7 @@ def review():
         audience_choices=STAKEHOLDER_ROLES,
         tlp_counts=tlp_counts(matching(all_veas, tests, skip="tlp")),
         audience_counts=misp_store.audience_counts(matching(all_veas, tests, skip="audience")),
+        can_publish=misp_session.current_user_can_publish(),
         sort=sort,
         dir=direction,
     )
@@ -426,18 +427,20 @@ def _build_seed_from_sources(source_uuids, source_pairs, source_events):
 
 @bp.route("/<string:id>/approve", methods=["POST"])
 def approve(id):
+    return_url = (url_for("vea.review") if request.form.get("return_to") == "review"
+                  else url_for("vea.detail", id=id))
     vea = misp_store.get_vea(id)
     if vea is None:
         return "VEA not found", 404
     if vea.review_state == misp_store.VEA_REVIEW_APPROVED:
         flash(f"{vea.vea_id} is already published. Resend delivers it again.", "warning")
-        return redirect(url_for("vea.detail", id=id))
+        return redirect(return_url)
     if not (vea.audience or "").strip():
         flash("A target audience is required before publishing. Edit the advisory and select an audience first.", "warning")
-        return redirect(url_for("vea.detail", id=id))
+        return redirect(return_url)
     if not misp_session.current_user_can_publish():
         flash(misp_session.publish_denied_message("approve and publish"), "warning")
-        return redirect(url_for("vea.detail", id=id))
+        return redirect(return_url)
     try:
         in_misp = misp_store.publish_vea(id)
         audit.record("publish", "vea", entity_id=id, entity_label=vea.vea_id)
@@ -448,7 +451,7 @@ def approve(id):
         flash("Notifications are being sent in the background; the job badge reports the result.", "info")
     except Exception as exc:
         flash(f"Could not publish VEA: {exc}", "warning")
-    return redirect(url_for("vea.detail", id=id))
+    return redirect(return_url)
 
 
 @bp.route("/<string:id>/reject", methods=["POST"])

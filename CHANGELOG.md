@@ -4,6 +4,7 @@
 
 ### Added
 
+- Detection engineering requests can be approved from the status board's "Approve first" button. It opens an inline review in the table, and approval refreshes the board.
 - Support for Microsoft Teams as a notification channel.
 - The stakeholder form has an icon next to "Products subscribed" that subscribes the stakeholder to every product, or clears the list.
 - AI settings for the AI-connector MISP module, with a "Test connection" button.
@@ -19,6 +20,9 @@
 
 ### Changed
 
+- Product edit forms share the same draft action styling and no longer offer "Publish & notify". Draft products have a distinct "Preview and approve" action. Detection requests keep "Approve first" until approved, and only then show the normal Preview action. The new threat actor profile form no longer has a Recipients button.
+- The detection request marks Audience as required. The threat actor profile form explains the audience requirement and shows a warning while none is selected.
+- The detection request's Engineering status card.
 - Newer OpenAI models such as gpt-6-luna work: OpenAI calls use `max_completion_tokens`, and a temperature or `reasoning_effort` a model refuses is left out, instead of the request failing.
 - A local model (on Ollama) no longer spends its token budget reasoning and returning an empty summary: zsazsa now turns thinking off with `reasoning_effort`, which Ollama's OpenAI endpoint reads, instead of `think`, which it ignores.
 - The manual collection entry locks its summary while an AI summary is being written, and an event created before the summary is done gets it when it is, shows the Markdown preview as high as the editor in split view, and links to the Collection sources for a missing source.
@@ -50,6 +54,7 @@
 
 ### Fixed
 
+- Threat actor profiles without an audience cannot be published, including older drafts. Unapproved detection requests still offer inline approval when their engineering status is no longer Pending.
 - Feedback from the threat actor profile, flash intel alert, vulnerability advisory, detection engineering request and daily briefing lists keeps the application's mount path, such as `/zsazsa`, instead of submitting outside it.
 - The settings pages refused site admins when `MISP_WEBAPP_KEY` was not a site admin's key (#71). The role is now asked with the user's own session.
 - With single sign-on, a short MISP `Session.timeout` or `Session.autoRegenerate` could end the session while working in zsazsa.

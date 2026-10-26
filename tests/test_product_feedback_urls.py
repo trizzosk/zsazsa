@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from pymisp import MISPEvent
 
 import config
-from webapp import audit, collection_cache, create_app, misp_store
+from webapp import audit, collection_cache, create_app, job_store, misp_store
 
 
 UUID = "8261112b-619c-4ee0-9409-c898df74520c"
@@ -36,6 +36,7 @@ class ProductFeedbackURLs(unittest.TestCase):
             mock.patch.object(config, "MISP_SESSION_REDIRECT_TO_LOGIN", False),
             mock.patch("webapp._setup_file_logging"),
             mock.patch.object(collection_cache, "start_worker"),
+            mock.patch.object(job_store, "_command", return_value=None),
             mock.patch.object(audit, "record"),
         ):
             self.enterContext(patch)

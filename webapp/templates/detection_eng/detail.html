@@ -155,22 +155,37 @@
       </div>
     </div>
 
-    <div class="card content-card mb-3">
-      <div class="card-header"><strong>Engineering status</strong></div>
+    {% set status_styles = {
+      'Pending': ('secondary', 'fa-hourglass-half'),
+      'In Dev': ('primary', 'fa-code'),
+      'In Test': ('warning', 'fa-flask'),
+      'Active': ('success', 'fa-circle-check'),
+      'Retired': ('secondary', 'fa-box-archive')
+    } %}
+    {% set status_tone, status_icon = status_styles.get(der.status, ('secondary', 'fa-circle')) %}
+    <div class="card content-card der-engineering-status mb-3" style="--der-status-color:var(--bs-{{ status_tone }});">
+      <div class="card-header d-flex align-items-center justify-content-between gap-2">
+        <span><i class="fas fa-sliders me-2 text-{{ status_tone }}" aria-hidden="true"></i>Engineering status</span>
+        <span class="badge rounded-pill bg-{{ status_tone }}-subtle text-{{ status_tone }}-emphasis">
+          <i class="fas {{ status_icon }} me-1" aria-hidden="true"></i>{{ der.status or 'Not set' }}
+        </span>
+      </div>
       <div class="card-body">
         <form method="post" action="{{ url_for('detection_eng.set_status', id=der.uuid) }}" class="d-flex gap-2">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <select name="status" class="form-select form-select-sm">
+          <label for="der-engineering-status" class="visually-hidden">Engineering status</label>
+          <select name="status" id="der-engineering-status" class="form-select form-select-sm">
             {% for s in statuses %}
             <option value="{{ s }}" {{ 'selected' if der.status == s }}>{{ s }}</option>
             {% endfor %}
           </select>
-          <button type="submit" class="btn btn-sm btn-outline-primary flex-shrink-0">Update</button>
+          <button type="submit" class="btn btn-sm btn-outline-primary flex-shrink-0">
+            <i class="fas fa-arrow-right-arrow-left me-1" aria-hidden="true"></i>Update
+          </button>
         </form>
-        <div class="form-text mt-1">
-          Independent of the publish workflow below: the team's own progress tracker, same board as the review list.
-          Also editable from the <a href="{{ url_for('detection_eng.review') }}">status board</a>. Leaving Pending requires this request to be approved first;
-          marking this <strong>Active</strong> requires the draft rule below to be filled in and passing Rulezet validation.
+        <div class="form-text mt-2">
+          Track engineering progress here or on the <a href="{{ url_for('detection_eng.review') }}">status board</a>, separately from publishing.
+          <span class="d-block mt-1"><i class="fas fa-shield-halved me-1" aria-hidden="true"></i>Approval is required to leave Pending. <strong>Active</strong> needs a saved draft rule that passes Rulezet validation.</span>
         </div>
       </div>
     </div>

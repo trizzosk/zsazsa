@@ -177,6 +177,10 @@ When tracking an actor you often want to list the infrastructure you have observ
 
 When collection turns up a threat you have no detection for, a **detection engineering request** asks the detection engineering team to write one. The request sets out the hypothesis, the technique it covers, the log sources it needs, what a hit should look like and how to test it. Detections you already have, found through Rulezet, go in as existing coverage.
 
+On the status board, **Approve first** opens the request in the table below. Users with MISP publish rights can review it and select **Approve & publish** without leaving the list. Approval publishes the request, starts stakeholder notifications and reloads the list so the board shows the approved state and allows the card to move.
+
+The flash intel alert, vulnerability advisory and detection request forms save drafts or submit them for review rather than publishing while editing. Threat actor profiles save drafts. On the briefing, flash intel alert, vulnerability advisory and threat actor profile lists, **Preview and approve** opens a draft inline. **Approve & publish** is beside **Recipients** at the top of the preview and requires MISP publish rights. Published products keep the normal Preview action. Detection requests use **Approve first** before approval and show Preview only once approved.
+
 ![docs/der1.png](docs/der1.png)
 
 A request is reviewed and approved like any other product. After that it moves along an engineering board (similar to intelligence

@@ -116,6 +116,7 @@ def review():
         audience_choices=STAKEHOLDER_ROLES,
         tlp_counts=tlp_counts(matching(all_taps, tests, skip="tlp")),
         audience_counts=misp_store.audience_counts(matching(all_taps, tests, skip="audience")),
+        can_publish=misp_session.current_user_can_publish(),
         sort=sort,
         dir=direction,
     )
@@ -300,15 +301,20 @@ def edit(id):
 
 @bp.route("/<string:id>/publish", methods=["POST"])
 def publish(id):
+    return_url = (url_for("threat_actor_profile.review") if request.form.get("return_to") == "review"
+                  else url_for("threat_actor_profile.detail", id=id))
     tap = misp_store.get_threat_actor_profile(id)
     if tap is None:
         return "Threat actor profile not found", 404
     if tap.status == "Published":
         flash(f"{tap.tap_id} is already published.", "warning")
-        return redirect(url_for("threat_actor_profile.detail", id=id))
+        return redirect(return_url)
     if not misp_session.current_user_can_publish():
         flash(misp_session.publish_denied_message(), "warning")
-        return redirect(url_for("threat_actor_profile.detail", id=id))
+        return redirect(return_url)
+    if not (tap.audience or "").strip():
+        flash("A target audience is required before publishing. Edit the profile and select an audience first.", "warning")
+        return redirect(return_url)
     try:
         in_misp = misp_store.publish_threat_actor_profile(id)
         audit.record("publish", "threat-actor-profile", entity_id=id, entity_label=tap.tap_id)
@@ -317,7 +323,7 @@ def publish(id):
             flash(misp_store.MISP_NOT_PUBLISHED, "warning")
     except Exception as exc:
         flash(f"Could not publish: {exc}", "warning")
-    return redirect(url_for("threat_actor_profile.detail", id=id))
+    return redirect(return_url)
 
 
 @bp.route("/<string:id>/notify", methods=["POST"])

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_product_actions.html" import draft_actions %}
 {% from "_macros.html" import product_identity, galaxy_multiselect %}
 
 {% set title_text = ('Edit ' + der.der_id) if is_edit else 'New detection engineering request' %}
@@ -154,10 +155,10 @@
   <div class="col-lg-4">
 
     <div class="card content-card mb-4">
-      <div class="card-header"><i class="fas fa-paper-plane me-2"></i>Delivery</div>
+      <div class="card-header"><i class="fas fa-paper-plane me-2"></i>Engineering request</div>
       <div class="card-body">
         <div class="mb-3">
-          <label class="form-label">Audience
+          <label class="form-label required-label">Audience
             <span class="text-muted small" data-bs-toggle="tooltip"
               title="Audience corresponds to the stakeholder role, e.g. Detection Engineering.">
               <i class="fas fa-circle-info ms-1"></i>
@@ -207,26 +208,7 @@
       </div>
     </div>
 
-    <div class="zs-actions d-grid gap-2">
-      <button type="submit" name="action" value="submit" class="btn btn-primary" id="btn-der-submit">
-        <i class="fas fa-paper-plane me-1"></i> Submit for review
-      </button>
-      <button type="submit" name="action" value="save" class="btn btn-outline-secondary" id="btn-der-save">
-        <i class="fas fa-floppy-disk me-1"></i> Save draft
-      </button>
-      {% if is_edit and can_publish %}
-      <button type="submit" name="action" value="publish" class="btn btn-success" id="btn-der-publish">
-        <i class="fas fa-check-circle me-1"></i> Publish &amp; notify
-      </button>
-      {% elif is_edit %}
-      <span class="d-block" style="cursor:not-allowed;" title="Only users with MISP publish rights can approve and publish.">
-        <button type="button" class="btn btn-success w-100" disabled style="pointer-events:none;">
-          <i class="fas fa-check-circle me-1"></i> Publish &amp; notify
-        </button>
-      </span>
-      {% endif %}
-      <a href="{{ url_for('detection_eng.review') }}" class="btn btn-outline-secondary">Cancel</a>
-    </div>
+    {{ draft_actions(url_for('detection_eng.review'), 'btn-der-save', 'btn-der-submit') }}
 
   </div>
 </form>
@@ -247,7 +229,7 @@ zsazsaBindRulezetAttackLookup({
 (function() {
   function _updateDerAudienceBtns() {
     var checked = document.querySelectorAll('.der-audience-cb:checked').length > 0;
-    ['btn-der-submit', 'btn-der-save', 'btn-der-publish'].forEach(function(id) {
+    ['btn-der-submit', 'btn-der-save'].forEach(function(id) {
       var b = document.getElementById(id);
       if (b) b.disabled = !checked;
     });

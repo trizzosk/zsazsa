@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_product_actions.html" import approval_form with context %}
 {% from "_macros.html" import audience_badges %}
 {% from "_sort_header.html" import sort_th with context %}
 
@@ -103,11 +104,13 @@
               </span>
             </div>
             <div class="text-muted" style="font-size:.7rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ d.title }}">{{ d.title | truncate(30) }}</div>
-            {% if col_status == 'Pending' and d.review_state != 'approved' %}
+            {% if d.review_state in ('draft', 'pending-review') %}
             <div class="mt-1">
-              <span class="badge" style="font-size:.6rem;background:var(--accent-orange);color:var(--text-on-accent);" title="Approve this request before tracking engineering status">
+              <button type="button" class="btn btn-xs btn-outline-warning approval-open"
+                      data-target="der-preview-{{ d.uuid }}" aria-controls="der-preview-{{ d.uuid }}"
+                      aria-expanded="false" title="Review and approve this request before tracking engineering status">
                 <i class="fas fa-gavel me-1"></i>Approve first
-              </span>
+              </button>
             </div>
             {% endif %}
           </div>
@@ -197,10 +200,13 @@
           <td class="text-end">
             <div class="d-inline-flex flex-nowrap align-items-center justify-content-end gap-2">
               <span class="d-inline-flex flex-nowrap gap-1">
+                {% if d.review_state == 'approved' %}
                 <button type="button" class="btn btn-xs btn-outline-secondary preview-toggle-btn"
-                        data-target="der-preview-{{ d.uuid }}" title="Preview">
-                  <i class="fas fa-eye"></i>
+                        data-target="der-preview-{{ d.uuid }}" aria-controls="der-preview-{{ d.uuid }}"
+                        aria-expanded="false" title="Preview">
+                  <i class="fas fa-fw fa-eye" aria-hidden="true"></i>
                 </button>
+                {% endif %}
                 <button type="button" class="btn btn-xs btn-outline-secondary feedback-btn"
                         data-action="{{ url_for('detection_eng.add_feedback', id=d.uuid) }}" data-der-id="{{ d.der_id }}"
                         data-bs-toggle="modal" data-bs-target="#feedback-modal" title="Give feedback">
@@ -252,11 +258,16 @@
                 <span class="req-id-badge">{{ d.der_id }}</span>
                 <span class="tlp-badge tlp-{{ d.tlp | slug }}">TLP:{{ d.tlp | upper }}</span>
                 {% if d.audience %}<span class="text-muted small">{{ d.audience }}</span>{% endif %}
-                <button type="button" class="btn btn-xs btn-outline-secondary ms-auto"
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                {% if d.review_state in ('draft', 'pending-review') %}
+                {{ approval_form(url_for('detection_eng.approve', id=d.uuid), can_publish, (d.audience or '') | trim) }}
+                {% endif %}
+                <button type="button" class="btn btn-xs btn-outline-secondary"
                         data-recipients-url="{{ url_for('detection_eng.recipients_fragment', id=d.uuid) }}"
                         title="Preview recipients">
                   <i class="fas fa-users me-1"></i>Recipients
                 </button>
+                </div>
               </div>
 
               <div class="row g-3">
@@ -287,6 +298,19 @@
                   {% endif %}
                 </div>
               </div>
+
+              {% if d.review_state in ('draft', 'pending-review') %}
+              {% set has_audience = (d.audience or '') | trim %}
+              <div class="border-top mt-3 pt-3">
+                <div class="fw-semibold small mb-2"><i class="fas fa-gavel me-1"></i>Approve this request</div>
+                <p class="small text-muted mb-2">Approval publishes this request and notifies eligible stakeholders. The status board refreshes after submission.</p>
+                {% if not can_publish %}
+                <p class="small text-muted mb-2">Only users with MISP publish rights can approve and publish.</p>
+                {% elif not has_audience %}
+                <p class="small text-warning mb-2">Select a target audience on the <a href="{{ url_for('detection_eng.wizard_edit', id=d.uuid) }}">edit form</a> before publishing.</p>
+                {% endif %}
+              </div>
+              {% endif %}
 
             </div>
           </td>
@@ -350,18 +374,33 @@
 {% block scripts %}
 <script>
 (function() {
+  function setPreview(row, open) {
+    row.style.display = open ? '' : 'none';
+    document.querySelectorAll('[data-target="' + row.id + '"]').forEach(function(btn) {
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (btn.classList.contains('preview-toggle-btn')) {
+        var icon = btn.querySelector('i');
+        if (icon) icon.className = open ? 'fas fa-fw fa-eye-slash' : 'fas fa-fw fa-eye';
+      }
+    });
+  }
+
   document.querySelectorAll('.preview-toggle-btn').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
       var targetId = btn.getAttribute('data-target');
       var row = document.getElementById(targetId);
       if (!row) return;
-      var open = row.style.display !== 'none';
-      row.style.display = open ? 'none' : '';
-      var icon = btn.querySelector('i');
-      if (icon) {
-        icon.className = open ? 'fas fa-eye' : 'fas fa-eye-slash';
-      }
+      setPreview(row, row.style.display === 'none');
+    });
+  });
+
+  document.querySelectorAll('.approval-open').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var row = document.getElementById(btn.dataset.target);
+      if (!row) return;
+      setPreview(row, true);
+      row.scrollIntoView({behavior: 'smooth', block: 'center'});
     });
   });
 

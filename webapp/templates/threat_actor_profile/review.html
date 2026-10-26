@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_product_actions.html" import preview_button, approval_form with context %}
 {% from "_sort_header.html" import sort_th with context %}
 
 {% block title %}Threat actor profiles | zsazsa CTI{% endblock %}
@@ -88,10 +89,7 @@
           <td class="text-end">
             <div class="d-inline-flex flex-nowrap align-items-center justify-content-end gap-2">
               <span class="d-inline-flex flex-nowrap gap-1">
-                <button type="button" class="btn btn-xs btn-outline-secondary preview-toggle-btn"
-                        data-target="tap-preview-{{ t.uuid }}" title="Preview">
-                  <i class="fas fa-eye"></i>
-                </button>
+                {{ preview_button('tap-preview-' ~ t.uuid, t.status == 'Draft') }}
                 <button type="button" class="btn btn-xs btn-outline-secondary feedback-btn"
                         data-action="{{ url_for('threat_actor_profile.add_feedback', id=t.uuid) }}" data-tap-id="{{ t.tap_id }}"
                         data-bs-toggle="modal" data-bs-target="#feedback-modal" title="Give feedback">
@@ -143,11 +141,16 @@
                 {% if t.audience %}<span class="text-muted small">{{ t.audience }}</span>{% endif %}
                 {% if t.author %}<span class="text-muted small">by {{ t.author }}</span>{% endif %}
                 {% if t.assessment_confidence %}<span class="text-muted small">· {{ t.assessment_confidence | capitalize }} confidence</span>{% endif %}
-                <button type="button" class="btn btn-xs btn-outline-secondary ms-auto"
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                {% if t.status == 'Draft' %}
+                {{ approval_form(url_for('threat_actor_profile.publish', id=t.uuid), can_publish, (t.audience or '') | trim) }}
+                {% endif %}
+                <button type="button" class="btn btn-xs btn-outline-secondary"
                         data-recipients-url="{{ url_for('threat_actor_profile.recipients_fragment', id=t.uuid) }}"
                         title="Preview recipients">
                   <i class="fas fa-users me-1"></i>Recipients
                 </button>
+                </div>
               </div>
               {% if t.summary %}
               <div class="mb-3">
@@ -169,9 +172,6 @@
                 {% for x in t.mitre_attack_techniques %}<span class="badge chip-source">{{ x }}</span>{% endfor %}
               </div>
               {% endif %}
-              <div class="mt-3">
-                <a href="{{ url_for('threat_actor_profile.detail', id=t.uuid) }}" class="btn btn-sm btn-outline-primary">Open full profile</a>
-              </div>
             </div>
           </td>
         </tr>
@@ -242,8 +242,9 @@
       if (!row) return;
       var open = row.style.display !== 'none';
       row.style.display = open ? 'none' : '';
+      btn.setAttribute('aria-expanded', open ? 'false' : 'true');
       var icon = btn.querySelector('i');
-      if (icon) icon.className = open ? 'fas fa-eye' : 'fas fa-eye-slash';
+      if (icon) icon.className = 'fas fa-fw ' + (open ? btn.dataset.previewIcon : 'fa-eye-slash');
       if (!open) {
         row.querySelectorAll('.report-md-body[data-md]').forEach(function(el) {
           zsazsaRenderMarkdown(el, el.getAttribute('data-md'));

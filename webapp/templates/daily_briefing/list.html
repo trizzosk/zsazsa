@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_product_actions.html" import preview_button, approval_form with context %}
 {% from "_sort_header.html" import sort_th with context %}
 {% from "_macros.html" import ai_job_badge, story_scope %}
 
@@ -78,10 +79,7 @@
           <td class="text-end">
             <div class="d-inline-flex flex-nowrap align-items-center justify-content-end gap-2">
               <span class="d-inline-flex flex-nowrap gap-1">
-                <button type="button" class="btn btn-xs btn-outline-secondary preview-toggle-btn"
-                        data-target="briefing-preview-{{ b.uuid }}" title="Preview">
-                  <i class="fas fa-eye"></i>
-                </button>
+                {{ preview_button('briefing-preview-' ~ b.uuid, b.review_state == 'draft') }}
                 <button type="button" class="btn btn-xs btn-outline-secondary feedback-btn"
                         data-action="{{ url_for('daily_briefing.add_feedback', id=b.uuid) }}" data-label="Briefing {{ b.date or b.uuid }}"
                         data-bs-toggle="modal" data-bs-target="#feedback-modal" title="Give feedback">
@@ -127,6 +125,16 @@
         <tr id="briefing-preview-{{ b.uuid }}" style="display:none;">
           <td colspan="8" class="p-0">
             <div class="px-4 py-3" style="background:var(--surface-muted);border-top:1px solid var(--border-light);">
+              <div class="d-flex align-items-center justify-content-end gap-2 mb-3">
+                {% if b.review_state == 'draft' %}
+                {{ approval_form(url_for('daily_briefing.publish', id=b.uuid), can_publish) }}
+                {% endif %}
+                <button type="button" class="btn btn-xs btn-outline-secondary"
+                        data-recipients-url="{{ url_for('daily_briefing.recipients_fragment', id=b.uuid) }}"
+                        title="Preview recipients">
+                  <i class="fas fa-users me-1"></i>Recipients
+                </button>
+              </div>
               <div class="row g-3">
                 <div class="col-md-9">
                   {% if b.summary %}
@@ -201,6 +209,7 @@
   </div>
 </div>
 {% include "_published_delete_note.html" %}
+{% include "_recipients_modal.html" %}
 
 {# ── Inline feedback modal ── #}
 <div class="modal fade" id="feedback-modal" tabindex="-1">
@@ -267,7 +276,8 @@ document.querySelectorAll('.preview-toggle-btn').forEach(function(btn) {
     if (!row) return;
     var visible = row.style.display !== 'none';
     row.style.display = visible ? 'none' : '';
-    btn.querySelector('i').className = visible ? 'fas fa-eye' : 'fas fa-eye-slash';
+    btn.setAttribute('aria-expanded', visible ? 'false' : 'true');
+    btn.querySelector('i').className = 'fas fa-fw ' + (visible ? btn.dataset.previewIcon : 'fa-eye-slash');
   });
 });
 

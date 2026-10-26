@@ -162,6 +162,7 @@ def review():
         audience_choices=STAKEHOLDER_ROLES,
         tlp_counts=tlp_counts(matching(all_ders, tests, skip="tlp")),
         audience_counts=misp_store.audience_counts(matching(all_ders, tests, skip="audience")),
+        can_publish=misp_session.current_user_can_publish(),
         sort=sort,
         dir=direction,
     )
@@ -344,18 +345,20 @@ def set_draft_rule(id):
 
 @bp.route("/<string:id>/approve", methods=["POST"])
 def approve(id):
+    return_url = (url_for("detection_eng.review") if request.form.get("return_to") == "review"
+                  else url_for("detection_eng.detail", id=id))
     der = misp_store.get_der(id)
     if der is None:
         return "Detection engineering request not found", 404
     if der.review_state == misp_store.DER_REVIEW_APPROVED:
         flash(f"{der.der_id} is already published. Resend delivers it again.", "warning")
-        return redirect(url_for("detection_eng.detail", id=id))
+        return redirect(return_url)
     if not (der.audience or "").strip():
         flash("A target audience is required before publishing. Edit the request and select an audience first.", "warning")
-        return redirect(url_for("detection_eng.detail", id=id))
+        return redirect(return_url)
     if not misp_session.current_user_can_publish():
         flash(misp_session.publish_denied_message("approve and publish"), "warning")
-        return redirect(url_for("detection_eng.detail", id=id))
+        return redirect(return_url)
     try:
         in_misp = misp_store.publish_der(id)
         audit.record("publish", "detection_eng", entity_id=id, entity_label=der.der_id)
@@ -366,7 +369,7 @@ def approve(id):
         flash("Notifications are being sent in the background; the job badge reports the result.", "info")
     except Exception as exc:
         flash(f"Could not publish detection engineering request: {exc}", "warning")
-    return redirect(url_for("detection_eng.detail", id=id))
+    return redirect(return_url)
 
 
 @bp.route("/<string:id>/reject", methods=["POST"])

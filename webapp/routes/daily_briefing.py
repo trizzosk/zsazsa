@@ -363,8 +363,21 @@ def list_briefings():
         state_counts=ordered_counts((b.review_state for b in matching(all_briefings, tests, skip="state")),
                                     misp_store.BRIEFING_REVIEW_STATES),
         tlp_counts=tlp_counts(matching(all_briefings, tests, skip="tlp")),
+        can_publish=misp_session.current_user_can_publish(),
         sort=sort,
         dir=direction,
+    )
+
+
+@bp.route("/<string:id>/recipients")
+def recipients_fragment(id):
+    briefing = misp_store.get_briefing(id)
+    if briefing is None:
+        return "Briefing not found", 404
+    return render_template(
+        "daily_briefing/_recipients.html",
+        briefing=briefing,
+        recipients=misp_store.stakeholders_cleared_for("Daily threat briefing", briefing.tlp),
     )
 
 
@@ -703,15 +716,17 @@ def add_stories(id):
 
 @bp.route("/<string:id>/publish", methods=["POST"])
 def publish(id):
+    return_url = (url_for("daily_briefing.list_briefings") if request.form.get("return_to") == "review"
+                  else url_for("daily_briefing.detail", id=id))
     briefing = misp_store.get_briefing(id)
     if briefing is None:
         return "Briefing not found", 404
     if briefing.review_state == misp_store.BRIEFING_REVIEW_PUBLISHED:
         flash(f"Daily briefing {briefing.date} is already published. Resend delivers it again.", "warning")
-        return redirect(url_for("daily_briefing.detail", id=id))
+        return redirect(return_url)
     if not misp_session.current_user_can_publish():
         flash(misp_session.publish_denied_message(), "warning")
-        return redirect(url_for("daily_briefing.detail", id=id))
+        return redirect(return_url)
     try:
         in_misp = misp_store.publish_briefing(id)
         audit.record("publish", "daily-briefing", entity_id=id,
@@ -724,7 +739,7 @@ def publish(id):
         flash("Notifications are being sent in the background; the job badge reports the result.", "info")
     except Exception as exc:
         flash(f"Could not publish briefing: {exc}", "warning")
-    return redirect(url_for("daily_briefing.detail", id=id))
+    return redirect(return_url)
 
 
 @bp.route("/<string:id>/resend", methods=["POST"])

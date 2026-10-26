@@ -767,6 +767,16 @@ body {
   padding: 1rem;
 }
 
+.der-engineering-status .card-header {
+  box-shadow: inset 3px 0 var(--der-status-color);
+}
+
+.der-engineering-status .form-select {
+  min-width: 0;
+  font-weight: 600;
+  background-color: var(--surface-tint);
+}
+
 /* Action panel: the titled shell around the dashboard quick actions and the
    data collection toolbar. Spacing stays with each page, they are not the same
    density, so only the shared look lives here. */

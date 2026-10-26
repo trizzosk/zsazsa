@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_product_actions.html" import draft_actions %}
 {% from "_macros.html" import galaxy_multiselect, product_identity, tag_input %}
 
 {% set title_text = ('Edit ' + fia.fia_id) if is_edit else 'New flash intel alert' %}
@@ -612,29 +613,7 @@
     </div>
     {% endif %}
 
-    <div class="zs-actions d-grid gap-2">
-      <button type="submit" name="action" value="submit" class="btn btn-primary" id="btn-fia-submit">
-        <i class="fas fa-paper-plane me-1"></i> Submit for review
-      </button>
-      <button type="submit" name="action" value="save" class="btn btn-outline-secondary" id="btn-fia-save">
-        <i class="fas fa-floppy-disk me-1"></i> Save draft
-      </button>
-      {% if is_edit and can_publish %}
-      <button type="submit" name="action" value="publish" class="btn btn-success" id="btn-fia-publish">
-        <i class="fas fa-check-circle me-1"></i> Publish &amp; notify
-      </button>
-      {% elif is_edit %}
-      {# The title sits on a wrapper because a disabled button fires no hover
-         events. The wrapper is a grid of its own so the button inside is laid
-         out exactly like the enabled one, without the inline gap under it. #}
-      <span class="d-grid" style="cursor:not-allowed;" title="Only users with MISP publish rights can approve and publish.">
-        <button type="button" class="btn btn-success" disabled style="pointer-events:none;">
-          <i class="fas fa-check-circle me-1"></i> Publish &amp; notify
-        </button>
-      </span>
-      {% endif %}
-      <a href="{{ url_for('flash_intel.review') }}" class="btn btn-outline-secondary">Cancel</a>
-    </div>
+    {{ draft_actions(url_for('flash_intel.review'), 'btn-fia-save', 'btn-fia-submit') }}
 
   </div>
 </form>
@@ -1050,7 +1029,7 @@
   // Audience validation
   function _updateFiaAudienceBtns() {
     var checked = document.querySelectorAll('input[name="audience"]:checked').length > 0;
-    ['btn-fia-submit', 'btn-fia-save', 'btn-fia-publish'].forEach(function(id) {
+    ['btn-fia-submit', 'btn-fia-save'].forEach(function(id) {
       var b = document.getElementById(id);
       if (b) b.disabled = !checked;
     });

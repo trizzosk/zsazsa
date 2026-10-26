@@ -354,7 +354,7 @@ class _ThreatActorProfileFixture(_Gate):
     def setUp(self):
         super().setUp()
         self.client = _client(threat_actor_profile.bp)
-        self.tap = SimpleNamespace(uuid=UUID, tap_id="TAP-00042", status="Draft")
+        self.tap = SimpleNamespace(uuid=UUID, tap_id="TAP-00042", status="Draft", audience="SOC")
         self.stub(threat_actor_profile.misp_store, "get_threat_actor_profile", return_value=self.tap)
         self.publish = self.stub(threat_actor_profile.misp_store, "publish_threat_actor_profile")
         self.deliver = self.stub(threat_actor_profile.notify_jobs, "start")
