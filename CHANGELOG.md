@@ -58,6 +58,7 @@
 - Updates to the follow-up flag. Flags lost when the cache was rebuilt come back, and a follow-up tag added or removed in MISP shows after the next refresh.
 - The labelled lines of an AI summary ran together into one paragraph in MISP.
 - AI summaries never tagged MITRE ATT&CK techniques, because zsazsa looked them up in the mitre-malware galaxy.
+- Publishing a threat actor profile also publishes the underlying MISP event.
 - Deleting an alert, advisory, detection request or briefing left the `zsazsa:product` tag on its source events, which then never got another advisory or briefing story. The tag now comes off unless another product of that type uses the event, and editing the sources updates the tags too.
 
 ### Security
@@ -78,6 +79,7 @@
 - The `ASSET_INVENTORY_*` settings are new and need nothing: the asset database is off until switched on.
 - The `zsazsa-flash-intel` (version 5) and `zsazsa-vea` (version 3) templates have a new `analyser-reason` attribute. Nothing needs doing; older drafts show no reason.
 - With Docker, an update does not replace the prompts in `docker/volumes/prompts`. Copy the new `zsazsaprompts/flash_intel_relevance.md` there, or add its line about the publisher on the Prompts tab.
+- Threat actor profiles published before this release, and published products that got feedback, have an unpublished MISP event. Publish them in MISP if they should be.
 - Source events of products deleted before this release keep their `zsazsa:product` tag. Remove it in MISP where it is in the way.
 - `PIPELINE_RUN_LOG_RETENTION_DAYS` now defaults to 90 days. A value already saved under Settings stays as it is.
 - Behind an outbound proxy, add `EnvironmentFile=-/etc/environment` to `/etc/systemd/system/zsazsa.service`, then `systemctl daemon-reload` and restart zsazsa.

@@ -294,10 +294,12 @@ def wizard_edit(id):
             misp_store.update_der(id, data)
             audit.record("update", "detection_eng", entity_id=id, entity_label=der.der_id)
             if action == "publish":
-                misp_store.publish_der(id)
+                in_misp = misp_store.publish_der(id)
                 audit.record("publish", "detection_eng", entity_id=id, entity_label=der.der_id)
                 _start_der_delivery(der.der_id, id, "publish")
                 flash(f"{der.der_id} published.", "success")
+                if not in_misp:
+                    flash(misp_store.MISP_NOT_PUBLISHED, "warning")
                 flash("Notifications are being sent in the background; the job badge reports the result.", "info")
             else:
                 flash(f"{der.der_id} saved.", "success")
@@ -355,10 +357,12 @@ def approve(id):
         flash(misp_session.publish_denied_message("approve and publish"), "warning")
         return redirect(url_for("detection_eng.detail", id=id))
     try:
-        misp_store.publish_der(id)
+        in_misp = misp_store.publish_der(id)
         audit.record("publish", "detection_eng", entity_id=id, entity_label=der.der_id)
         _start_der_delivery(der.der_id, id, "publish")
         flash(f"{der.der_id} approved and published.", "success")
+        if not in_misp:
+            flash(misp_store.MISP_NOT_PUBLISHED, "warning")
         flash("Notifications are being sent in the background; the job badge reports the result.", "info")
     except Exception as exc:
         flash(f"Could not publish detection engineering request: {exc}", "warning")
@@ -531,9 +535,12 @@ def add_feedback(id):
     rating = request.form.get("rating", "").strip()
     comment = request.form.get("comment", "").strip()
     try:
-        misp_store.add_product_feedback(der.uuid, author, rating, comment)
+        in_misp = misp_store.add_product_feedback(der.uuid, author, rating, comment,
+                                                    published=der.published)
         audit.record("create", "detection_eng_feedback", entity_id=id, entity_label=der.der_id)
         flash("Feedback recorded.", "success")
+        if not in_misp:
+            flash(misp_store.MISP_NOT_PUBLISHED, "warning")
     except Exception as exc:
         logger.warning("add_feedback DER %s failed: %s", id, exc)
         flash(f"Could not record feedback: {exc}", "warning")

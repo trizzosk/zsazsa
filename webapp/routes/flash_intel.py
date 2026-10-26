@@ -314,10 +314,12 @@ def wizard_edit(id):
                 # publish_fia also publishes the MISP event, which updating the
                 # review state alone does not. Delivery runs as a background job,
                 # which writes its own notify audit entry when it finishes.
-                misp_store.publish_fia(id)
+                in_misp = misp_store.publish_fia(id)
                 audit.record("publish", "fia", entity_id=id, entity_label=fia.fia_id)
                 _start_flash_intel_delivery(fia.fia_id, id, "publish")
                 flash(f"{fia.fia_id} published.", "success")
+                if not in_misp:
+                    flash(misp_store.MISP_NOT_PUBLISHED, "warning")
                 flash("Notifications are being sent in the background; the job badge reports the result.", "info")
             else:
                 flash(f"{fia.fia_id} saved.", "success")
@@ -348,10 +350,12 @@ def approve(id):
         flash(misp_session.publish_denied_message("approve and publish"), "warning")
         return redirect(url_for("flash_intel.detail", id=id))
     try:
-        misp_store.publish_fia(id)
+        in_misp = misp_store.publish_fia(id)
         audit.record("publish", "fia", entity_id=id, entity_label=fia.fia_id)
         _start_flash_intel_delivery(fia.fia_id, id, "publish")
         flash(f"{fia.fia_id} approved and published.", "success")
+        if not in_misp:
+            flash(misp_store.MISP_NOT_PUBLISHED, "warning")
         flash("Notifications are being sent in the background; the job badge reports the result.", "info")
     except Exception as exc:
         flash(f"Could not publish FIA: {exc}", "warning")
@@ -424,9 +428,12 @@ def add_feedback(id):
     rating = request.form.get("rating", "").strip()
     comment = request.form.get("comment", "").strip()
     try:
-        misp_store.add_product_feedback(fia.uuid, author, rating, comment)
+        in_misp = misp_store.add_product_feedback(fia.uuid, author, rating, comment,
+                                                    published=fia.published)
         audit.record("create", "fia_feedback", entity_id=id, entity_label=fia.fia_id)
         flash("Feedback recorded.", "success")
+        if not in_misp:
+            flash(misp_store.MISP_NOT_PUBLISHED, "warning")
     except Exception as exc:
         logger.warning("add_feedback FIA %s failed: %s", id, exc)
         flash(f"Could not record feedback: {exc}", "warning")

@@ -310,9 +310,11 @@ def publish(id):
         flash(misp_session.publish_denied_message(), "warning")
         return redirect(url_for("threat_actor_profile.detail", id=id))
     try:
-        misp_store.publish_threat_actor_profile(id)
+        in_misp = misp_store.publish_threat_actor_profile(id)
         audit.record("publish", "threat-actor-profile", entity_id=id, entity_label=tap.tap_id)
         flash(f"{tap.tap_id} published.", "success")
+        if not in_misp:
+            flash(misp_store.MISP_NOT_PUBLISHED, "warning")
     except Exception as exc:
         flash(f"Could not publish: {exc}", "warning")
     return redirect(url_for("threat_actor_profile.detail", id=id))
@@ -389,9 +391,12 @@ def add_feedback(id):
     rating = request.form.get("rating", "").strip()
     comment = request.form.get("comment", "").strip()
     try:
-        misp_store.add_product_feedback(tap.uuid, author, rating, comment)
+        in_misp = misp_store.add_product_feedback(tap.uuid, author, rating, comment,
+                                                    published=tap.published)
         audit.record("create", "threat-actor-profile-feedback", entity_id=id, entity_label=tap.tap_id)
         flash("Feedback recorded.", "success")
+        if not in_misp:
+            flash(misp_store.MISP_NOT_PUBLISHED, "warning")
     except Exception as exc:
         flash(f"Could not record feedback: {exc}", "warning")
     return redirect(url_for("threat_actor_profile.detail", id=id))

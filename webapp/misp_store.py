@@ -965,6 +965,26 @@ def _check(result, label="MISP"):
     return result
 
 
+MISP_NOT_PUBLISHED = "MISP refused to publish the event, so it is not published there. Publish it in MISP; the log says why."
+
+
+def publish_event(misp, event, label) -> bool:
+    """Publish an event without MISP's alert e-mail, and say whether MISP did.
+
+    Callers publish what they have just written, and editing an event
+    unpublishes it, so a refusal comes back as False rather than an exception:
+    a product is approved by then, and its delivery still has to go out.
+    """
+    try:
+        reply = misp.publish(event, alert=False)
+        failed = reply.get("errors") if isinstance(reply, dict) else None
+    except Exception as exc:
+        failed = exc
+    if failed:
+        logger.warning("MISP did not publish %s: %s", label, failed)
+    return not failed
+
+
 _KEY_CHECK_TIMEOUT_S = 5
 
 # What zsazsa does with MISP_WEBAPP_KEY that a role can be without, and what
@@ -2533,6 +2553,7 @@ def _tap_ns(event):
         tlp=_obj_attr(obj, "tlp") or "amber",
         status=_obj_attr(obj, "status") or "Draft",
         published_at=_parse_dt(_obj_attr(obj, "published-at")),
+        published=bool(getattr(event, "published", False)),
         linked_pir_uuid=_obj_attr(obj, "linked-pir-uuid") or "",
         source_reliability=_obj_attr(obj, "source-reliability") or "",
         source_credibility=_obj_attr(obj, "source-credibility") or "",
@@ -2656,6 +2677,7 @@ def publish_threat_actor_profile(uuid):
     data["status"] = "Published"
     data["published_at"] = date.today().isoformat()
     update_threat_actor_profile(uuid, data)
+    return publish_event(_misp(), uuid, f"threat actor profile {tap.tap_id}")
 
 
 def delete_threat_actor_profile(uuid):
@@ -3521,8 +3543,12 @@ def report_date(report) -> str:
     return ts.strftime("%Y-%m-%d") if ts else ""
 
 
-def add_product_feedback(event_uuid, author, rating, comment):
-    """Append a feedback event report and tag the event."""
+def add_product_feedback(event_uuid, author, rating, comment, published=False):
+    """Append a feedback event report and tag the event.
+
+    MISP unpublishes an event when a report is added to it, so one that was
+    ``published`` is published again. False when MISP refused that.
+    """
     from pymisp import MISPEventReport
 
     misp = _misp()
@@ -3541,6 +3567,7 @@ def add_product_feedback(event_uuid, author, rating, comment):
         misp.tag(event_uuid, TAG_FEEDBACK)
     except Exception as exc:
         logger.warning("tag %s with feedback failed: %s", event_uuid, exc)
+    return publish_event(misp, event_uuid, f"{event_uuid} again after its feedback") if published else True
 
 
 def list_pending_feedback_products(fias=None, veas=None):
@@ -5346,13 +5373,10 @@ def set_fia_review_state(uuid, state, reason=None):
 
 
 def publish_fia(uuid):
-    """Mark the FIA approved, set workflow=complete, publish the MISP event."""
+    """Mark the FIA approved, set workflow=complete, publish the MISP event.
+    False when MISP refused to publish it."""
     set_fia_review_state(uuid, FIA_REVIEW_APPROVED)
-    misp = _misp()
-    try:
-        misp.publish(uuid)
-    except Exception as exc:
-        logger.warning("publish FIA %s failed: %s", uuid, exc)
+    return publish_event(_misp(), uuid, f"FIA {uuid}")
 
 
 def reject_fia(uuid, reason=""):
@@ -6191,11 +6215,7 @@ def set_vea_review_state(uuid, state, reason=None):
 
 def publish_vea(uuid):
     set_vea_review_state(uuid, VEA_REVIEW_APPROVED)
-    misp = _misp()
-    try:
-        misp.publish(uuid)
-    except Exception as exc:
-        logger.warning("publish VEA %s failed: %s", uuid, exc)
+    return publish_event(_misp(), uuid, f"VEA {uuid}")
 
 
 def reject_vea(uuid, reason=""):
@@ -6572,11 +6592,7 @@ def set_der_review_state(uuid, state, reason=None):
 
 def publish_der(uuid):
     set_der_review_state(uuid, DER_REVIEW_APPROVED)
-    misp = _misp()
-    try:
-        misp.publish(uuid)
-    except Exception as exc:
-        logger.warning("publish DER %s failed: %s", uuid, exc)
+    return publish_event(_misp(), uuid, f"DER {uuid}")
 
 
 def reject_der(uuid, reason=""):
@@ -7131,7 +7147,7 @@ def _update_briefing(uuid, data, expected_state):
 
 def publish_briefing(uuid):
     with _briefing_write_lock:
-        _publish_briefing(uuid)
+        return _publish_briefing(uuid)
 
 
 def _publish_briefing(uuid):
@@ -7157,10 +7173,7 @@ def _publish_briefing(uuid):
         misp.tag(event.uuid, 'workflow:state="complete"', local=True)
     except Exception as exc:
         logger.warning("tag briefing %s complete failed: %s", uuid, exc)
-    try:
-        misp.publish(uuid)
-    except Exception as exc:
-        logger.warning("publish briefing %s failed: %s", uuid, exc)
+    return publish_event(misp, uuid, f"briefing {uuid}")
 
 
 def delete_briefing(uuid):
@@ -7647,7 +7660,7 @@ def add_tlr_correction(uuid, text):
     event = _tlr_event(uuid)
     correction = {"date": date.today().isoformat(), "by": misp_session.current_user_email(), "text": text}
     _rewrite_tlr(misp, event, {"corrections": _tlr_ns(event).corrections + [correction]})
-    misp.publish(event)
+    return publish_event(misp, event, f"threat landscape report {uuid}")
 
 
 def publish_tlr(uuid):
@@ -7662,7 +7675,7 @@ def publish_tlr(uuid):
             except Exception:
                 pass
     misp.tag(uuid, 'workflow:state="published"', local=True)
-    misp.publish(event)
+    return publish_event(misp, event, f"threat landscape report {uuid}")
 
 
 def delete_tlr(uuid):

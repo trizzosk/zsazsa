@@ -198,6 +198,7 @@ def _automated_subscribers() -> list:
 def _auto_publish(misp_webapp, product_event, fia_id, content, recipients):
     """Mark the FIA approved, publish, and deliver it to the automated subscribers."""
     from notifier import dispatcher
+    from webapp import misp_store
 
     # Re-fetch so newly attached objects are present with server IDs.
     fresh = misp_webapp.get_event(product_event.uuid, pythonify=True)
@@ -221,7 +222,7 @@ def _auto_publish(misp_webapp, product_event, fia_id, content, recipients):
             logger.warning("Auto-publish %s: review-state attribute not found", fia_id)
 
     tagger.set_workflow_state(misp_webapp, product_event, "complete")
-    misp_webapp.publish(product_event.uuid)
+    misp_store.publish_event(misp_webapp, product_event.uuid, fia_id)
 
     # The analyser has no FIA namespace of its own, so the fields the senders read
     # are named directly; `id` carries the MISP link Mattermost puts under the

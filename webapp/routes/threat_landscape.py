@@ -461,9 +461,12 @@ def add_feedback(id):
     rating = request.form.get("rating", "").strip()
     comment = request.form.get("comment", "").strip()
     try:
-        misp_store.add_product_feedback(tlr.uuid, author, rating, comment)
+        in_misp = misp_store.add_product_feedback(tlr.uuid, author, rating, comment,
+                                                    published=tlr.published)
         audit.record("create", "tlr_feedback", entity_id=id, entity_label=tlr.tlr_id)
         flash("Feedback recorded.", "success")
+        if not in_misp:
+            flash(misp_store.MISP_NOT_PUBLISHED, "warning")
     except Exception as exc:
         logger.warning("add_feedback TLR %s failed: %s", id, exc)
         flash(f"Could not record feedback: {exc}", "warning")
@@ -504,13 +507,15 @@ def publish(id):
         flash("A report is published once it has been reviewed and approved.", "warning")
         return redirect(url_for("threat_landscape.detail", id=id))
     try:
-        misp_store.publish_tlr(id)
+        in_misp = misp_store.publish_tlr(id)
     except Exception as exc:
         flash(f"Could not publish TLR: {exc}", "warning")
         return redirect(url_for("threat_landscape.detail", id=id))
     audit.record("publish", "tlr", entity_id=id, entity_label=tlr.tlr_id)
     _start_delivery(tlr, "publish")
     flash(f"{tlr.tlr_id} published. It is being sent to its recipients; the job badge reports the result.", "success")
+    if not in_misp:
+        flash(misp_store.MISP_NOT_PUBLISHED, "warning")
     return redirect(url_for("threat_landscape.detail", id=id))
 
 
@@ -551,9 +556,11 @@ def correction(id):
         flash(misp_session.publish_denied_message("correct a published report"), "warning")
         return redirect(url_for("threat_landscape.detail", id=id))
     try:
-        misp_store.add_tlr_correction(id, text)
+        in_misp = misp_store.add_tlr_correction(id, text)
         audit.record("update", "tlr", entity_id=id, entity_label=tlr.tlr_id, details="correction")
         flash("Correction added. Resend the report if its recipients should see it.", "success")
+        if not in_misp:
+            flash(misp_store.MISP_NOT_PUBLISHED, "warning")
     except Exception as exc:
         flash(f"Could not add the correction: {exc}", "warning")
     return redirect(url_for("threat_landscape.detail", id=id))

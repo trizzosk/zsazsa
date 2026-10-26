@@ -308,10 +308,12 @@ def wizard_edit(id):
             misp_store.update_vea(id, data)
             audit.record("update", "vea", entity_id=id, entity_label=vea.vea_id)
             if action == "publish":
-                misp_store.publish_vea(id)
+                in_misp = misp_store.publish_vea(id)
                 audit.record("publish", "vea", entity_id=id, entity_label=vea.vea_id)
                 _start_vea_delivery(vea.vea_id, id, "publish")
                 flash(f"{vea.vea_id} published.", "success")
+                if not in_misp:
+                    flash(misp_store.MISP_NOT_PUBLISHED, "warning")
                 flash("Notifications are being sent in the background; the job badge reports the result.", "info")
             else:
                 flash(f"{vea.vea_id} saved.", "success")
@@ -437,10 +439,12 @@ def approve(id):
         flash(misp_session.publish_denied_message("approve and publish"), "warning")
         return redirect(url_for("vea.detail", id=id))
     try:
-        misp_store.publish_vea(id)
+        in_misp = misp_store.publish_vea(id)
         audit.record("publish", "vea", entity_id=id, entity_label=vea.vea_id)
         _start_vea_delivery(vea.vea_id, id, "publish")
         flash(f"{vea.vea_id} approved and published.", "success")
+        if not in_misp:
+            flash(misp_store.MISP_NOT_PUBLISHED, "warning")
         flash("Notifications are being sent in the background; the job badge reports the result.", "info")
     except Exception as exc:
         flash(f"Could not publish VEA: {exc}", "warning")
@@ -513,9 +517,12 @@ def add_feedback(id):
     rating = request.form.get("rating", "").strip()
     comment = request.form.get("comment", "").strip()
     try:
-        misp_store.add_product_feedback(vea.uuid, author, rating, comment)
+        in_misp = misp_store.add_product_feedback(vea.uuid, author, rating, comment,
+                                                    published=vea.published)
         audit.record("create", "vea_feedback", entity_id=id, entity_label=vea.vea_id)
         flash("Feedback recorded.", "success")
+        if not in_misp:
+            flash(misp_store.MISP_NOT_PUBLISHED, "warning")
     except Exception as exc:
         logger.warning("add_feedback VEA %s failed: %s", id, exc)
         flash(f"Could not record feedback: {exc}", "warning")

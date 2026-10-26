@@ -32,7 +32,7 @@ zsazsa follows the daily CTI workflow, from collection through triage and analys
 - **Requirements (PIR and GIR)** hold the intelligence questions that drive collection, with their scope, ownership and distribution.
 - **RFIs** handle one-off requests from intake to closure, with an SLA, an owner, a linked PIR or GIR, response confidence, attachments, notes and feedback.
 - **Data collection** is the cached view of the scraper MISP, other MISP servers, and manual or newsletter sources. You browse and triage events, enrich them with scope items from the MISP galaxies, generate an AI summary, and start a product straight from a source event.
-- **Products** are a repository of what you publish, with preview and feedback. zsazsa produces Flash Intel Alerts, Vulnerability advisories, Daily threat briefings, Threat landscape reports, Indicator feeds, Threat actor profiles and Detection engineering requests.
+- **Products** are a repository of what you publish, with preview and feedback. zsazsa produces Flash Intel Alerts, Vulnerability advisories, Daily threat briefings, Threat landscape reports, Indicator feeds, Threat actor profiles and Detection engineering requests. Publishing a product also publishes its MISP event, without MISP's alert e-mail; indicator feeds are delivered and not published.
 - **Statistics** cover pipeline and program metrics, RFI and feedback data, and a scope coverage showing where collection and analysis are concentrated. A CTI-CMM maturity panel maps against levels CTI0 to CTI3.
 - **Background jobs** show the analyser runs, AI summaries, deliveries and the scheduled collection runs while they run.
 

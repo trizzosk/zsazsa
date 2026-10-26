@@ -526,13 +526,7 @@ def _publish_again(misp, event) -> bool:
     events are read from another MISP server, so it would leave the collection
     page at the next refresh.
     """
-    try:
-        failed = _misp_response_errors(misp.publish(event.id, alert=False))
-    except Exception as exc:
-        failed = str(exc)
-    if failed:
-        logger.warning("Could not publish %s again after its summary: %s", event.uuid, failed)
-    return not failed
+    return misp_store.publish_event(misp, event.id, f"{event.uuid} again after its summary")
 
 
 def _generate_ai_summary(misp, event, source_id, user="", kind="scraper"):

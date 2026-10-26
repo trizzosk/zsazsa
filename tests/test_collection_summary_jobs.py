@@ -665,7 +665,7 @@ class SummaryOnAnotherMispServer(unittest.TestCase):
         misp.tag.assert_not_called()
 
     def test_an_event_that_could_not_be_published_again_is_said_so(self):
-        with self.assertLogs("webapp.routes.data_collection", level="WARNING"):
+        with self.assertLogs("webapp.misp_store", level="WARNING"):
             (ok, message, _status), *_ = self.summarise(published={"errors": (403, "Not allowed")})
         self.assertTrue(ok)
         self.assertIn("could not be published again", message)

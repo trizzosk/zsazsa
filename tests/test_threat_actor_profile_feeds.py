@@ -109,7 +109,9 @@ class Publishing(unittest.TestCase):
 
     def _publish(self, tap):
         with mock.patch.object(misp_store, "get_threat_actor_profile", return_value=tap), \
-             mock.patch.object(misp_store, "update_threat_actor_profile") as update:
+             mock.patch.object(misp_store, "update_threat_actor_profile") as update, \
+             mock.patch.object(misp_store, "_misp"), \
+             mock.patch.object(misp_store, "publish_event"):
             misp_store.publish_threat_actor_profile("u" * 36)
         return update.call_args[0][1]
 

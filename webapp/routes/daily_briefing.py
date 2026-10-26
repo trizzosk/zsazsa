@@ -563,10 +563,13 @@ def add_feedback(id):
     rating = request.form.get("rating", "").strip()
     comment = request.form.get("comment", "").strip()
     try:
-        misp_store.add_product_feedback(briefing.uuid, author, rating, comment)
+        in_misp = misp_store.add_product_feedback(briefing.uuid, author, rating, comment,
+                                                    published=briefing.published)
         audit.record("create", "briefing_feedback", entity_id=id,
                      entity_label=f"Daily briefing {briefing.date}")
         flash("Feedback recorded.", "success")
+        if not in_misp:
+            flash(misp_store.MISP_NOT_PUBLISHED, "warning")
     except Exception as exc:
         logger.warning("add_feedback briefing %s failed: %s", id, exc)
         flash(f"Could not record feedback: {exc}", "warning")
@@ -710,12 +713,14 @@ def publish(id):
         flash(misp_session.publish_denied_message(), "warning")
         return redirect(url_for("daily_briefing.detail", id=id))
     try:
-        misp_store.publish_briefing(id)
+        in_misp = misp_store.publish_briefing(id)
         audit.record("publish", "daily-briefing", entity_id=id,
                      entity_label=f"Daily briefing {briefing.date}")
         _start_briefing_delivery(id, briefing.date,
                                  url_for("daily_briefing.detail", id=id, _external=True), "publish")
         flash(f"Daily briefing {briefing.date} published.", "success")
+        if not in_misp:
+            flash(misp_store.MISP_NOT_PUBLISHED, "warning")
         flash("Notifications are being sent in the background; the job badge reports the result.", "info")
     except Exception as exc:
         flash(f"Could not publish briefing: {exc}", "warning")

@@ -35,11 +35,11 @@ class WizardPublish(unittest.TestCase):
         self.fia = SimpleNamespace(uuid=self.uuid, fia_id="FIA-00042", audience="SOC",
                                    review_state="draft", tlp="amber")
 
-    def post(self, action):
+    def post(self, action, in_misp=True):
         with mock.patch("webapp.misp_session.current_user_can_publish", return_value=True), \
              mock.patch.object(flash_intel.misp_store, "get_fia", return_value=self.fia), \
              mock.patch.object(flash_intel.misp_store, "update_fia") as update, \
-             mock.patch.object(flash_intel.misp_store, "publish_fia") as publish, \
+             mock.patch.object(flash_intel.misp_store, "publish_fia", return_value=in_misp) as publish, \
              mock.patch.object(flash_intel.misp_store, "fetch_source_events", return_value=[]), \
              mock.patch.object(flash_intel, "_form_data", return_value={"audience": "SOC"}), \
              mock.patch.object(flash_intel, "_start_flash_intel_delivery") as deliver, \
@@ -54,6 +54,15 @@ class WizardPublish(unittest.TestCase):
         update.assert_called_once()
         publish.assert_called_once_with(self.uuid)
         deliver.assert_called_once_with("FIA-00042", self.uuid, "publish")
+
+    def test_an_event_misp_refused_to_publish_is_reported_and_the_alert_still_goes_out(self):
+        """The alert is approved by then: delivery goes ahead, and the analyst
+        is told the MISP event is not published."""
+        _reply, _update, _publish, deliver = self.post("publish", in_misp=False)
+        deliver.assert_called_once()
+        with self.client.session_transaction() as session:
+            flashed = [message for _category, message in session["_flashes"]]
+        self.assertIn(flash_intel.misp_store.MISP_NOT_PUBLISHED, flashed)
 
     def test_saving_publishes_nothing_and_notifies_nobody(self):
         _reply, update, publish, deliver = self.post("save")

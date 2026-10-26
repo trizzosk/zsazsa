@@ -146,7 +146,7 @@ class StoredReview(unittest.TestCase):
     def test_a_correction_is_kept_and_the_event_published_again(self):
         misp_store.add_tlr_correction(UUID, "The second chart counted July twice.")
         self.assertEqual(self.stored().corrections[0]["text"], "The second chart counted July twice.")
-        self.misp.publish.assert_called_once_with(self.event)
+        self.misp.publish.assert_called_once_with(self.event, alert=False)
 
     def test_an_edit_keeps_the_review_log(self):
         misp_store.update_tlr(UUID, {"tlr_id": "TLR-00009", "title": "Q3"})

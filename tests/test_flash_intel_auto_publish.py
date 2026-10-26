@@ -122,7 +122,7 @@ class AutoPublishDelivery(unittest.TestCase):
 
     def test_the_event_is_published_before_anything_is_sent(self):
         _send, misp_webapp = self.publish([_stakeholder("Acme")])
-        misp_webapp.publish.assert_called_once_with("u" * 36)
+        misp_webapp.publish.assert_called_once_with("u" * 36, alert=False)
 
     def test_the_draft_is_marked_approved(self):
         _send, misp_webapp = self.publish([_stakeholder("Acme")])
