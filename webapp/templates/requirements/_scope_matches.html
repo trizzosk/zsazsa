@@ -54,7 +54,7 @@
             </div>
           </td>
           <td>
-            <a href="{{ url_for('data_collection.detail', uuid=m.uuid) }}" class="btn btn-xs btn-outline-info">
+            <a href="{{ url_for('data_collection.detail', uuid=m.uuid, source=m.source_id or None) }}" class="btn btn-xs btn-outline-info">
               <i class="fas fa-arrow-right"></i>
             </a>
           </td>

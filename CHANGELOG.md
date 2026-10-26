@@ -54,6 +54,7 @@
 
 ### Fixed
 
+- A PIR or GIR match from another MISP server or a manual source showed "Event not found" when opened from the scope preview or the PIR's recent matches. The link now names the source.
 - Threat actor profiles without an audience cannot be published, including older drafts. Unapproved detection requests still offer inline approval when their engineering status is no longer Pending.
 - Feedback from the threat actor profile, flash intel alert, vulnerability advisory, detection engineering request and daily briefing lists keeps the application's mount path, such as `/zsazsa`, instead of submitting outside it.
 - The settings pages refused site admins when `MISP_WEBAPP_KEY` was not a site admin's key (#71). The role is now asked with the user's own session.

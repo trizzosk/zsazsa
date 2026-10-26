@@ -7293,6 +7293,7 @@ def preview_scope_matches(scope_terms, limit=200, max_results=50, timeframe_hour
         rows.append({
             "uuid": e.get("uuid"),
             "id": e.get("id"),
+            "source_id": e.get("source_id"),
             "info": e.get("info"),
             "date": e.get("date") or "",
             "matched_terms": matched,

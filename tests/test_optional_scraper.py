@@ -17,7 +17,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from flask import Flask, get_flashed_messages
+from flask import Flask, get_flashed_messages, render_template
 from pymisp.exceptions import PyMISPError
 
 from webapp import collection_cache, create_app, job_store, misp_store
@@ -429,6 +429,18 @@ class ScopePreviewSources(unittest.TestCase):
         self.cache("community")
         with mock.patch.object(misp_store.config, "MISP_SERVERS", []):
             self.assertEqual(self.matches(), ["scraper ransomware story"])
+
+    def test_a_match_opens_on_the_server_it_came_from(self):
+        """The collection page reads an event from the scraper unless told
+        otherwise, so a link without the source showed "Event not found"."""
+        self.cache("community")
+        app = Flask(__name__, template_folder=str(Path(data_collection.__file__).parents[1] / "templates"))
+        app.register_blueprint(data_collection.bp)
+        with app.test_request_context():
+            body = render_template("requirements/_scope_matches.html", terms=["ransomware"],
+                                   matches=misp_store.preview_scope_matches(["ransomware"]),
+                                   embedded=True, timeframe_action="", timeframe_key="", timeframe_options=[])
+        self.assertIn("/collection/community-0?source=community", body)
 
     def test_manual_sources_are_searched_without_naming_them_out_of_misp(self):
         """Listing manual sources pages through MISP, and this runs on every PIR

@@ -429,7 +429,7 @@
         <div class="text-muted mb-1" style="font-size:.75rem;">Recent matches:</div>
         {% for row in coverage.sample %}
         <div class="mb-1" style="font-size:.78rem;">
-          <a href="{{ url_for('data_collection.detail', uuid=row.uuid) }}" target="_blank"
+          <a href="{{ url_for('data_collection.detail', uuid=row.uuid, source=row.source_id or None) }}" target="_blank"
              class="text-decoration-none text-truncate d-block" style="max-width:100%;">
             <span class="text-muted me-1">{{ row.date }}</span>{{ row.info | truncate(60) }}
           </a>
