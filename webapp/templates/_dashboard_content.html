@@ -171,40 +171,48 @@
 {% endif %}
 
 <div class="row g-3 mb-4">
-  <div class="col-sm-4">
-    <div class="stat-card">
-      <div class="stat-icon" style="--icon-color: var(--accent-blue);">
-        <i class="fas fa-star"></i>
-      </div>
-      <div class="stat-body">
-        <div class="stat-number">{{ pir_count }}</div>
-        <div class="stat-label">Priority Intelligence Requirements</div>
-      </div>
-      <a href="{{ url_for('requirements.pir_list') }}" class="stat-link">View all <i class="fas fa-arrow-right fa-xs"></i></a>
-    </div>
-  </div>
-  <div class="col-sm-4">
-    <div class="stat-card">
-      <div class="stat-icon" style="--icon-color: var(--accent-green);">
-        <i class="fas fa-list-check"></i>
-      </div>
-      <div class="stat-body">
-        <div class="stat-number">{{ gir_count }}</div>
-        <div class="stat-label">General Intelligence Requirements</div>
-      </div>
-      <a href="{{ url_for('requirements.gir_list') }}" class="stat-link">View all <i class="fas fa-arrow-right fa-xs"></i></a>
-    </div>
-  </div>
-  <div class="col-sm-4">
-    <div class="stat-card">
-      <div class="stat-icon" style="--icon-color: var(--accent-orange);">
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card" style="--icon-color: var(--accent-orange);">
+      <div class="stat-icon">
         <i class="fas fa-users"></i>
       </div>
       <div class="stat-body">
         <div class="stat-number">{{ stakeholder_count }}</div>
-        <div class="stat-label">Stakeholders</div>
+        <a href="{{ url_for('stakeholders.list') }}" class="stat-label stretched-link d-block text-decoration-none">Stakeholders</a>
       </div>
-      <a href="{{ url_for('stakeholders.list') }}" class="stat-link">View all <i class="fas fa-arrow-right fa-xs"></i></a>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card" style="--icon-color: var(--accent-blue);">
+      <div class="stat-icon">
+        <i class="fas fa-star"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-number">{{ pir_count }}</div>
+        <a href="{{ url_for('requirements.pir_list') }}" class="stat-label stretched-link d-block text-decoration-none">Priority Intelligence Requirements</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card" style="--icon-color: var(--accent-green);">
+      <div class="stat-icon">
+        <i class="fas fa-list-check"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-number">{{ gir_count }}</div>
+        <a href="{{ url_for('requirements.gir_list') }}" class="stat-label stretched-link d-block text-decoration-none">General Intelligence Requirements</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card" style="--icon-color: var(--accent-purple);">
+      <div class="stat-icon">
+        <i class="fas fa-circle-question"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-number">{{ rfi_count }}</div>
+        <a href="{{ url_for('rfi.rfi_list') }}" class="stat-label stretched-link d-block text-decoration-none">Requests for Information</a>
+      </div>
     </div>
   </div>
 </div>
@@ -215,7 +223,7 @@
   <div class="col-lg-6">
     <div class="card content-card chart-card h-100" style="--icon-color:var(--accent-blue);">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <span class="d-flex align-items-center gap-2"><span class="stat-icon icon-sm"><i class="fas fa-star"></i></span>Active PIRs</span>
+        <a href="{{ url_for('requirements.pir_list') }}" class="d-flex align-items-center gap-2 text-reset text-decoration-none"><span class="stat-icon icon-sm"><i class="fas fa-star"></i></span>Active PIRs</a>
         <span class="d-flex align-items-center gap-2">
           {% if active_pirs %}<span class="chart-badge">{{ active_pirs | length }} active</span>{% endif %}
           <a href="{{ url_for('requirements.pir_new') }}" class="btn btn-xs btn-outline-primary" title="New PIR">
@@ -254,7 +262,7 @@
   <div class="col-lg-6">
     <div class="card content-card chart-card h-100" style="--icon-color:var(--accent-green);">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <span class="d-flex align-items-center gap-2"><span class="stat-icon icon-sm"><i class="fas fa-list-check"></i></span>Active GIRs</span>
+        <a href="{{ url_for('requirements.gir_list') }}" class="d-flex align-items-center gap-2 text-reset text-decoration-none"><span class="stat-icon icon-sm"><i class="fas fa-list-check"></i></span>Active GIRs</a>
         <span class="d-flex align-items-center gap-2">
           {% if active_girs %}<span class="chart-badge">{{ active_girs | length }} active</span>{% endif %}
           <a href="{{ url_for('requirements.gir_new') }}" class="btn btn-xs btn-outline-success" title="New GIR">

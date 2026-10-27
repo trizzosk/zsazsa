@@ -204,6 +204,7 @@ def list_stakeholders():
         tests["product"] = lambda s: product_filter in s.products
     stakeholders = _sort_stakeholders(matching(all_stakeholders, tests), request.args.get("sort"), request.args.get("dir"))
     by_product = matching(all_stakeholders, tests, skip="product")
+    pirs, girs = misp_store.list_pirs(), misp_store.list_girs()
 
     return render_template(
         "stakeholders/list.html",
@@ -212,7 +213,9 @@ def list_stakeholders():
         role_counts=Counter(s.role or "Unspecified" for s in matching(all_stakeholders, tests, skip="role")).most_common(),
         subscription_counts=Counter(p for s in by_product for p in s.products).most_common(),
         unsubscribed=sum(1 for s in by_product if not s.products),
-        owned_records=misp_store.records_owned_by_stakeholders(),
+        owned_records=misp_store.records_owned_by_stakeholders(pirs, girs),
+        requirement_counts={s.uuid: (misp_store.active_requirement_counts(s, pirs),
+                                     misp_store.active_requirement_counts(s, girs)) for s in stakeholders},
         org_map=org_map,
         org_options=org_options,
         role_options=role_options,

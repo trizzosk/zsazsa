@@ -3649,15 +3649,18 @@ def girs_for_stakeholder(stakeholder_uuid):
     return [g for g in list_girs() if g.owner_uuid == stakeholder_uuid]
 
 
-def records_owned_by_stakeholders():
+def records_owned_by_stakeholders(pirs=None, girs=None):
     """{stakeholder UUID: ids of the PIRs, GIRs and RFIs it owns}.
 
     An owner is kept by UUID, so a stakeholder in here cannot be deleted
-    without leaving those records pointing at nothing.
+    without leaving those records pointing at nothing. A caller that has the
+    PIRs and GIRs already passes them, so MISP is not searched for them twice.
     """
+    pirs = list_pirs() if pirs is None else pirs
+    girs = list_girs() if girs is None else girs
     owned = {}
-    for owner_uuid, record_id in ([(p.owner_uuid, p.pir_id) for p in list_pirs()]
-                                  + [(g.owner_uuid, g.gir_id) for g in list_girs()]
+    for owner_uuid, record_id in ([(p.owner_uuid, p.pir_id) for p in pirs]
+                                  + [(g.owner_uuid, g.gir_id) for g in girs]
                                   + [(r.owner_uuid, r.rfi_id) for r in list_rfis()]):
         if owner_uuid:
             owned.setdefault(owner_uuid, []).append(record_id)
@@ -3698,6 +3701,16 @@ def girs_distributed_to_stakeholder(stakeholder_uuid, stakeholder_name="", stake
         if g.owner_uuid != stakeholder_uuid
         and _matches_distribution_entry(g.distribution, stakeholder_uuid, stakeholder_name, stakeholder_email)
     ]
+
+
+def active_requirement_counts(stakeholder, requirements):
+    """(owned, listed): how many of the active PIRs or GIRs in ``requirements``
+    the stakeholder owns, and how many more have it in their distribution."""
+    active = [r for r in requirements if r.status == "Active"]
+    owned = sum(1 for r in active if r.owner_uuid == stakeholder.uuid)
+    listed = sum(1 for r in active if r.owner_uuid != stakeholder.uuid and _matches_distribution_entry(
+        r.distribution, stakeholder.uuid, stakeholder.name, stakeholder.email))
+    return owned, listed
 
 
 def linked_pir_uuids(event) -> set:

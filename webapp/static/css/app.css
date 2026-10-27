@@ -931,6 +931,14 @@ body {
   gap: 1rem;
   position: relative;
   overflow: hidden;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+
+/* As the dashboard's Quick actions tiles do. */
+.stat-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--icon-color, var(--accent-blue));
+  box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--icon-color, var(--accent-blue)) 55%, transparent);
 }
 
 .stat-card::before {
@@ -974,19 +982,9 @@ body {
   margin-top: 2px;
 }
 
-.stat-link {
-  position: absolute;
-  right: 1rem;
-  bottom: 0.75rem;
-  font-size: 0.72rem;
+/* The label's stretched link makes the whole card clickable. */
+.stat-card:hover a.stat-label {
   color: var(--accent-blue);
-  text-decoration: none;
-  opacity: .75;
-  transition: opacity .15s;
-}
-
-.stat-link:hover {
-  opacity: 1;
 }
 
 /* ─── Charts ─────────────────────────────────────────────────────────────── */

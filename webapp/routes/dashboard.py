@@ -101,6 +101,7 @@ def widgets():
         girs = misp_store.list_girs()
         # Only the number is shown, so the stakeholders' metadata is enough.
         stakeholder_count = misp_store.count_records(config.TAG_STAKEHOLDER)
+        rfi_count = misp_store.count_records(config.TAG_RFI)
         pir_count = len(pirs)
         gir_count = len(girs)
         active_pirs = [
@@ -110,7 +111,7 @@ def widgets():
         active_girs = [g for g in girs if g.status == "Active"]
     except Exception:
         logger.exception("Failed to load requirements for dashboard")
-        pir_count = gir_count = stakeholder_count = 0
+        pir_count = gir_count = stakeholder_count = rfi_count = 0
         active_pirs = active_girs = []
 
     try:
@@ -170,6 +171,7 @@ def widgets():
         pir_count=pir_count,
         gir_count=gir_count,
         stakeholder_count=stakeholder_count,
+        rfi_count=rfi_count,
         active_pirs=active_pirs,
         active_girs=active_girs,
         priority_counts=ordered_counts((p.priority for p in active_pirs), MOSCOW_PRIORITIES),

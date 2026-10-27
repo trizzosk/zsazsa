@@ -270,6 +270,8 @@ class Pages(TempDatabase):
             mock.patch.object(config, "NOTIFICATION_CHANNELS", []),
             mock.patch.object(collection_cache, "start_worker"),
             mock.patch("webapp.audit.record"),
+            mock.patch.multiple(misp_store, list_pirs=mock.Mock(return_value=[]),
+                                list_girs=mock.Mock(return_value=[])),
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -386,6 +388,28 @@ class Pages(TempDatabase):
         self.assertTrue(reason.button.has_attr("disabled"))
         forms = [f["action"] for f in page.select("form[data-submit-confirm]")]
         self.assertEqual(forms, [f"/stakeholders/{'b' * 36}/delete"])
+
+    def test_the_list_counts_the_active_requirements_owned_and_listed(self):
+        """Owned first, then listed in the distribution and owned by someone
+        else. A stakeholder with neither is shown in red."""
+        bob, cy = "b" * 36, "c" * 36
+        pirs = [SimpleNamespace(owner_uuid=UUID, pir_id="PIR-001", status="Active", distribution=[UUID, bob]),
+                SimpleNamespace(owner_uuid=cy, pir_id="PIR-002", status="Active", distribution=[UUID]),
+                SimpleNamespace(owner_uuid=bob, pir_id="PIR-003", status="Retired", distribution=[UUID])]
+        girs = [SimpleNamespace(owner_uuid=UUID, gir_id="GIR-001", status="Active", distribution=[])]
+        with mock.patch.object(misp_store, "list_stakeholders", return_value=self.STAKEHOLDERS), \
+             mock.patch.multiple(misp_store, list_pirs=mock.Mock(return_value=pirs),
+                                 list_girs=mock.Mock(return_value=girs), list_rfis=mock.Mock(return_value=[])):
+            page = BeautifulSoup(self.client.get("/stakeholders/").data, "html.parser")
+        columns = [th.get_text(strip=True) for th in page.select("thead th")]
+        pir, gir = columns.index("PIR"), columns.index("GIR")
+        rows = {tr.a.get_text(): tr.find_all("td") for tr in page.select("tbody tr")}
+        self.assertEqual({name: (cells[pir].get_text(), cells[gir].get_text()) for name, cells in rows.items()},
+                         {"Ada": ("1/1", "1/0"), "Bob": ("0/1", "0/0"), "Cy": ("1/0", "0/0")})
+        self.assertEqual([name for name, cells in rows.items() if "text-danger" in cells[gir].span["class"]],
+                         ["Bob", "Cy"])
+        self.assertNotIn("text-danger", rows["Ada"][pir].span["class"])
+        self.assertEqual(rows["Bob"][gir].span["title"], "0 owned; 0 in distribution")
 
     def test_the_page_of_an_owner_disables_delete(self):
         empty = {name: mock.Mock(return_value=[]) for name in (

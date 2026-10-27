@@ -96,7 +96,7 @@ def _offline_patches(tmp):
     misp.get_organisation.return_value = SimpleNamespace(name=MARKUP)
 
     empty = ("galaxy_geography", "galaxy_sectors", "galaxy_threat_actors",
-             "galaxy_mitre_attack_patterns", "list_selectable_pirs", "list_pirs",
+             "galaxy_mitre_attack_patterns", "list_selectable_pirs", "list_pirs", "list_girs",
              "pirs_for_stakeholder", "pirs_distributed_to_stakeholder",
              "girs_for_stakeholder", "girs_distributed_to_stakeholder",
              "products_for_stakeholder")

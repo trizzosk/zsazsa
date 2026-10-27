@@ -114,6 +114,8 @@
           <th>Organisation</th>
           <th>TLP clearance</th>
           <th>Products</th>
+          <th title="Active PIRs it owns / active PIRs with it in their distribution">PIR</th>
+          <th title="Active GIRs it owns / active GIRs with it in their distribution">GIR</th>
           <th class="text-end">Actions</th>
         </tr>
       </thead>
@@ -139,6 +141,10 @@
             <span class="text-muted">-</span>
             {% endif %}
           </td>
+          {% for owned, listed in requirement_counts[s.uuid] %}
+          <td><span class="small {{ 'text-danger' if not owned and not listed else 'text-muted' }}"
+                    title="{{ owned }} owned; {{ listed }} in distribution">{{ owned }}/{{ listed }}</span></td>
+          {% endfor %}
           <td class="text-end">
             <a href="{{ url_for('stakeholders.edit', id=s.id) }}" class="btn btn-xs btn-outline-secondary me-1" title="Edit">
               <i class="fas fa-pen"></i>

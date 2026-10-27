@@ -49,7 +49,7 @@ class Panes(unittest.TestCase):
         self.app = create_app()
 
     def render(self, **data):
-        context = dict(setup_needed=False, stakeholder_count=1, pir_count=1, gir_count=1,
+        context = dict(setup_needed=False, stakeholder_count=1, pir_count=1, gir_count=1, rfi_count=1,
                        active_pirs=[], active_girs=[], actor_type_products=[], throughput_by_source=[],
                        configured_sources=[])
         context.update(data)
@@ -66,6 +66,17 @@ class Panes(unittest.TestCase):
 
     def text(self, element):
         return element.get_text(" ", strip=True)
+
+    def test_the_counts_open_their_lists(self):
+        page = self.render(stakeholder_count=4, pir_count=3, gir_count=2, rfi_count=5)
+        with self.app.test_request_context("/"):
+            lists = [url_for(e) for e in ("stakeholders.list", "requirements.pir_list", "requirements.gir_list",
+                                          "rfi.rfi_list")]
+        cards = page.select(".stat-card")
+        self.assertEqual([self.text(c) for c in cards],
+                         ["4 Stakeholders", "3 Priority Intelligence Requirements",
+                          "2 General Intelligence Requirements", "5 Requests for Information"])
+        self.assertEqual([c.select_one("a.stat-label")["href"] for c in cards], lists)
 
     def test_active_pirs_with_their_priority_mix(self):
         pirs = [_pir(1, "Must have"), _pir(2, "Should have", "In Development"), _pir(3, "Should have")]
@@ -172,7 +183,7 @@ class Loading(unittest.TestCase):
              mock.patch.object(dashboard, "_pipeline_status", return_value=status):
             return self.client.get("/dashboard/widgets").get_json()["html"]
 
-    def test_the_alerts_are_read_once_for_both_panes_and_stakeholders_only_counted(self):
+    def test_the_alerts_are_read_once_for_both_panes_and_stakeholders_and_rfis_only_counted(self):
         """Both panes searched MISP for every alert, and every stakeholder was
         loaded whole to show how many there are."""
         veas = mock.Mock(return_value=[])
@@ -181,7 +192,8 @@ class Loading(unittest.TestCase):
         veas.assert_called_once_with()
         self.assertIn("State-Nexus Actors", html)
         self.list_stakeholders.assert_not_called()
-        self.count_records.assert_called_once_with(config.TAG_STAKEHOLDER)
+        self.assertEqual([c.args for c in self.count_records.call_args_list],
+                         [(config.TAG_STAKEHOLDER,), (config.TAG_RFI,)])
 
     def test_the_alerts_still_show_when_the_advisories_fail(self):
         with self.assertLogs("webapp.routes.dashboard", level="ERROR"):
