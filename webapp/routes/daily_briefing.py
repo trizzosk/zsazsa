@@ -354,6 +354,7 @@ def list_briefings():
     return render_template(
         "daily_briefing/list.html",
         briefings=briefings,
+        rejected_count=sum(b.review_state == misp_store.BRIEFING_REVIEW_REJECTED for b in all_briefings),
         ai_jobs=job_store.by_entity("briefing-draft"),
         scope_summaries={b.uuid: misp_store.briefing_combined_scope_summary(b) for b in briefings},
         state_filter=state_filter,
@@ -623,7 +624,7 @@ def edit(id):
             **_parse_briefing_scope_from_form(request.form),
         }
         try:
-            misp_store.update_briefing(id, data)
+            misp_store.update_briefing(id, data, expected_state=briefing.review_state)
             audit.record("update", "daily-briefing", entity_id=id,
                          entity_label=f"Daily briefing {data['date']}")
             flash("Briefing updated.", "success")
@@ -724,6 +725,9 @@ def publish(id):
     if briefing.review_state == misp_store.BRIEFING_REVIEW_PUBLISHED:
         flash(f"Daily briefing {briefing.date} is already published. Resend delivers it again.", "warning")
         return redirect(return_url)
+    if briefing.review_state == misp_store.BRIEFING_REVIEW_REJECTED:
+        flash("Rejected briefings cannot be published.", "warning")
+        return redirect(return_url)
     if not misp_session.current_user_can_publish():
         flash(misp_session.publish_denied_message(), "warning")
         return redirect(return_url)
@@ -762,6 +766,51 @@ def resend(id):
                              url_for("daily_briefing.detail", id=id, _external=True), "resend")
     flash(f"Briefing {briefing.date} resend started; the job badge reports the result.", "info")
     return redirect(redirect_target)
+
+
+@bp.route("/<string:id>/reject", methods=["POST"])
+def reject(id):
+    return_url = (url_for("daily_briefing.list_briefings") if request.form.get("return_to") == "review"
+                  else url_for("daily_briefing.detail", id=id))
+    briefing = misp_store.get_briefing(id)
+    if briefing is None:
+        return "Briefing not found", 404
+    if briefing.review_state == misp_store.BRIEFING_REVIEW_PUBLISHED:
+        flash("Published briefings cannot be rejected.", "warning")
+        return redirect(return_url)
+    try:
+        misp_store.reject_briefing(id, reason=request.form.get("reason", "").strip())
+        audit.record("reject", "daily-briefing", entity_id=id,
+                     entity_label=f"Daily briefing {briefing.date}")
+        flash(f"Daily briefing {briefing.date} rejected.", "info")
+    except Exception as exc:
+        flash(f"Could not reject briefing: {exc}", "warning")
+    return redirect(return_url)
+
+
+@bp.route("/rejected/delete", methods=["POST"])
+def delete_rejected():
+    deleted = 0
+    try:
+        rejected = [b for b in misp_store.list_briefings()
+                    if b.review_state == misp_store.BRIEFING_REVIEW_REJECTED]
+    except Exception as exc:
+        flash(f"Could not list rejected briefings: {exc}", "warning")
+        return redirect(url_for("daily_briefing.list_briefings"))
+    for briefing in rejected:
+        try:
+            current = misp_store.get_briefing(briefing.uuid)
+            if current is None or current.review_state != misp_store.BRIEFING_REVIEW_REJECTED:
+                continue
+            misp_store.delete_briefing(briefing.uuid, expected_state=misp_store.BRIEFING_REVIEW_REJECTED)
+            deleted += 1
+            audit.record("delete", "daily-briefing", entity_id=briefing.uuid,
+                         entity_label=f"Daily briefing {briefing.date}")
+        except Exception as exc:
+            flash(f"Could not delete briefing {briefing.date}: {exc}", "warning")
+    flash(f"Deleted {deleted} rejected briefing{'s' if deleted != 1 else ''}.",
+          "success" if deleted else "info")
+    return redirect(url_for("daily_briefing.list_briefings"))
 
 
 @bp.route("/<string:id>/delete", methods=["POST"])

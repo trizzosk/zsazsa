@@ -189,6 +189,7 @@ def review():
     return render_template(
         "flash_intel/review.html",
         fias=fias,
+        rejected_count=sum(f.review_state == misp_store.FIA_REVIEW_REJECTED for f in all_fias),
         reference_items_by_uuid=reference_items_by_uuid,
         state_filter=state_filter,
         review_states=misp_store.FIA_REVIEW_STATES,
@@ -367,13 +368,15 @@ def approve(id):
 
 @bp.route("/<string:id>/reject", methods=["POST"])
 def reject(id):
+    return_url = (url_for("flash_intel.review") if request.form.get("return_to") == "review"
+                  else url_for("flash_intel.detail", id=id))
     fia = misp_store.get_fia(id)
     if fia is None:
         return "FIA not found", 404
     # Rejecting a published alert would make it editable and deletable again.
     if fia.review_state == misp_store.FIA_REVIEW_APPROVED:
         flash("Published alerts cannot be rejected.", "warning")
-        return redirect(url_for("flash_intel.detail", id=id))
+        return redirect(return_url)
     reason = request.form.get("reason", "").strip()
     try:
         misp_store.reject_fia(id, reason=reason)
@@ -381,7 +384,30 @@ def reject(id):
         flash(f"{fia.fia_id} rejected.", "info")
     except Exception as exc:
         flash(f"Could not reject FIA: {exc}", "warning")
-    return redirect(url_for("flash_intel.detail", id=id))
+    return redirect(return_url)
+
+
+@bp.route("/rejected/delete", methods=["POST"])
+def delete_rejected():
+    deleted = 0
+    try:
+        rejected = misp_store.list_fias(review_state=misp_store.FIA_REVIEW_REJECTED)
+    except Exception as exc:
+        flash(f"Could not list rejected alerts: {exc}", "warning")
+        return redirect(url_for("flash_intel.review"))
+    for fia in rejected:
+        try:
+            current = misp_store.get_fia(fia.uuid)
+            if current is None or current.review_state != misp_store.FIA_REVIEW_REJECTED:
+                continue
+            misp_store.delete_fia(fia.uuid, expected_state=misp_store.FIA_REVIEW_REJECTED)
+            deleted += 1
+            audit.record("delete", "fia", entity_id=fia.uuid, entity_label=fia.fia_id)
+        except Exception as exc:
+            flash(f"Could not delete {fia.fia_id}: {exc}", "warning")
+    flash(f"Deleted {deleted} rejected alert{'s' if deleted != 1 else ''}.",
+          "success" if deleted else "info")
+    return redirect(url_for("flash_intel.review"))
 
 
 @bp.route("/<string:id>/delete", methods=["POST"])

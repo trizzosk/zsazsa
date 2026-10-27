@@ -28,7 +28,7 @@ def _briefing(**over):
         uuid="b" * 36, date="2026-09-25", title="Daily briefing", author="koen",
         tlp="amber", escalations="", notes="", detection_rules="", summary="",
         summary_stale=False, review_state="draft", story_count=1,
-        creator="koen", approved_by="",
+        creator="koen", approved_by="", rejection_reason="",
         stories=[SimpleNamespace(title="One", content="", source_event_uuid="e1",
                                  source_id="scraper", drafted_by="",
                                  threat_actor_types=[])],
@@ -193,6 +193,13 @@ class APublishWhileDraftingIsNotUndone(unittest.TestCase):
         self.assertEqual(saved, [])
         self.assertEqual(job["status"], "failed")
 
+    def test_a_rejected_briefing_is_not_drafted(self):
+        saved, job = TheJobWritesOnce.run_job(
+            self, _briefing(review_state="rejected", rejection_reason="Needs verification."))
+        self.assertEqual(saved, [])
+        self.assertEqual(job["status"], "failed")
+        self.assertIn("rejected", job["message"])
+
     def test_a_briefing_published_meanwhile_fails_the_job_and_is_left_alone(self):
         def published_meanwhile(uuid, data, expected_state=None):
             raise api.misp_store.BriefingStateChanged("published")
@@ -208,7 +215,7 @@ class APublishWhileDraftingIsNotUndone(unittest.TestCase):
             api._run_briefing_draft_job(job["id"], "b" * 36, False, "koen@example.org")
         job = job_store.get_job(job["id"])
         self.assertEqual(job["status"], "failed")
-        self.assertIn("published while", job["message"])
+        self.assertIn("review state changed", job["message"])
         record.assert_not_called()
 
 

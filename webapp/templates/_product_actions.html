@@ -14,6 +14,55 @@
 </div>
 {% endmacro %}
 
+{% macro review_checks(kind, uuid, reject_url) %}
+{{ rejection_button(kind, uuid, reject_url) }}
+<button type="button" class="btn btn-xs btn-outline-info text-nowrap qa-review-btn"
+        data-kind="{{ kind }}" data-uuid="{{ uuid }}">
+  <i class="fas fa-clipboard-check me-1" aria-hidden="true"></i>QA check against source
+</button>
+{% endmacro %}
+
+{% macro rejection_button(kind, uuid, action) %}
+<div class="dropdown">
+<button type="button" class="btn btn-xs btn-outline-danger text-nowrap"
+        data-bs-toggle="dropdown"
+        aria-controls="reject-{{ kind }}-{{ uuid }}" aria-expanded="false">
+  <i class="fas fa-xmark me-1" aria-hidden="true"></i>Reject
+</button>
+{{ rejection_form(action, kind, uuid) }}
+</div>
+{% endmacro %}
+
+{% macro rejection_form(action, kind, uuid) %}
+<div class="dropdown-menu shadow-sm" id="reject-{{ kind }}-{{ uuid }}" style="width:20rem;max-width:calc(100vw - 2rem);">
+  <form method="post" action="{{ action }}" class="inline-rejection-form p-2">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="return_to" value="review">
+    <label for="reason-{{ kind }}-{{ uuid }}" class="form-label small">
+      Rejection reason <span class="text-muted">(optional)</span>
+    </label>
+    <textarea id="reason-{{ kind }}-{{ uuid }}" name="reason"
+              class="form-control form-control-sm mb-2" rows="2"></textarea>
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-xs btn-outline-danger">
+        <i class="fas fa-xmark me-1" aria-hidden="true"></i>Confirm rejection
+      </button>
+      <button type="button" class="btn btn-xs btn-outline-secondary">Cancel</button>
+    </div>
+  </form>
+</div>
+{% endmacro %}
+
+{% macro delete_rejected_form(action, count) %}
+<form method="post" action="{{ action }}" class="d-flex justify-content-end mt-2"
+      data-submit-confirm="Delete all {{ count }} rejected products, regardless of the current filters? This cannot be undone.">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button type="submit" class="btn btn-xs btn-outline-danger" {% if not count %}disabled{% endif %}>
+    <i class="fas fa-trash me-1" aria-hidden="true"></i>Delete all rejected products ({{ count }})
+  </button>
+</form>
+{% endmacro %}
+
 {% macro preview_button(target, approvable=False) %}
 <button type="button" class="btn btn-xs btn-outline-{{ 'success' if approvable else 'secondary' }} preview-toggle-btn"
         data-target="{{ target }}" aria-controls="{{ target }}" aria-expanded="false"
@@ -23,8 +72,9 @@
 </button>
 {% endmacro %}
 
-{% macro approval_form(action, can_publish, has_audience=True) %}
-<form method="post" action="{{ action }}" class="inline-approval-form">
+{% macro approval_form(action, can_publish, has_audience=True, confirmation=None) %}
+<form method="post" action="{{ action }}" class="inline-approval-form"
+      {% if confirmation %}data-submit-confirm="{{ confirmation }}"{% endif %}>
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="return_to" value="review">
   <button type="submit" class="btn btn-xs btn-success text-nowrap"

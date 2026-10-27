@@ -1,7 +1,7 @@
 {# "QA check against source": audits a product draft against the report content of
    its source events and lists what a reviewer should fix before publishing.
    Included from the flash intel and vulnerability advisory pages, both on the
-   detail view and in the edit wizard. #}
+   detail view, in list previews and in the edit wizard. #}
 <script>
 (function() {
   var VERDICT_CLASS = {
@@ -60,9 +60,17 @@
     // wizards can group the button into an AI toolbar without losing it.
     var out = btn.closest('.qa-review-block').querySelector('.qa-review-output');
     btn.addEventListener('click', function() {
+      var label = Array.from(btn.childNodes);
+      var spinner = document.createElement('i');
+      spinner.className = 'fas fa-spinner fa-spin me-1';
+      spinner.setAttribute('aria-hidden', 'true');
+      btn.replaceChildren(spinner, document.createTextNode('Checking source…'));
       btn.disabled = true;
-      out.textContent = 'Checking the draft against the source events…';
-      out.className = 'qa-review-output mb-2 small text-muted';
+      btn.setAttribute('aria-busy', 'true');
+      out.setAttribute('role', 'status');
+      out.setAttribute('aria-live', 'polite');
+      out.textContent = 'Checking the draft against the source events. Keep this page open to see the result.';
+      out.className = 'qa-review-output mb-2 alert alert-info py-2 small';
 
       fetch(SCRIPT_ROOT + '/api/qa-review', {
         method: 'POST',
@@ -86,7 +94,11 @@
         out.className = 'qa-review-output mb-2 small text-danger';
         out.textContent = 'QA review did not complete: ' + zsazsaErrorText(err);
       })
-      .finally(function() { btn.disabled = false; });
+      .finally(function() {
+        btn.replaceChildren(...label);
+        btn.disabled = false;
+        btn.removeAttribute('aria-busy');
+      });
     });
   });
 })();

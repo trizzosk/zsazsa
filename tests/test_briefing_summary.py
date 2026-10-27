@@ -281,7 +281,7 @@ def _stored_briefing():
     """
     return SimpleNamespace(
         date="2026-08-08", title="Daily briefing", author="koen", tlp="green",
-        review_state="draft", story_count=3,
+        review_state="draft", rejection_reason="Needs verification.", story_count=3,
         escalations="One escalation.", notes="A note.", detection_rules="rule-1",
         summary="Four of six stories concern EU logistics.", summary_stale=True,
         geographic_scope=["Belgium"], sectors=["Transport"], threat_actors=["Luna Moth"],

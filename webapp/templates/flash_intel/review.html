@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_product_actions.html" import preview_button, approval_form with context %}
+{% from "_product_actions.html" import preview_button, approval_form, review_checks, delete_rejected_form with context %}
 {% from "_macros.html" import audience_badges %}
 {% from "_sort_header.html" import sort_th with context %}
 
@@ -38,6 +38,7 @@
             {% endif %}
           </div>
         </form>
+        {{ delete_rejected_form(url_for('flash_intel.delete_rejected'), rejected_count) }}
       </div>
       {% if state_counts or tlp_counts or audience_counts %}
       <div class="col-lg-9 list-stats">
@@ -139,17 +140,18 @@
         {# ── Expandable preview row ── #}
         <tr id="fia-preview-{{ f.uuid }}" style="display:none;">
           <td colspan="7" class="p-0">
-            <div style="background:var(--surface-muted);border-top:1px solid var(--border-light);padding:1rem 1.25rem;">
+            <div class="qa-review-block" style="background:var(--surface-muted);border-top:1px solid var(--border-light);padding:1rem 1.25rem;">
 
               {# Header strip #}
-              <div class="d-flex align-items-center gap-3 mb-3">
+              <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
                 <span class="req-id-badge">{{ f.fia_id }}</span>
                 <span class="tlp-badge tlp-{{ f.tlp | slug }}">TLP:{{ f.tlp | upper }}</span>
                 {% if f.audience %}<span class="text-muted small">{{ f.audience }}</span>{% endif %}
                 {% if f.author %}<span class="text-muted small">by {{ f.author }}</span>{% endif %}
-                <div class="d-flex align-items-center gap-2 ms-auto">
+                <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
                 {% if f.review_state in ('draft', 'pending-review') %}
                 {{ approval_form(url_for('flash_intel.approve', id=f.uuid), can_publish, (f.audience or '') | trim) }}
+                {{ review_checks('fia', f.uuid, url_for('flash_intel.reject', id=f.uuid)) }}
                 {% endif %}
                 <button type="button" class="btn btn-xs btn-outline-secondary"
                         data-recipients-url="{{ url_for('flash_intel.recipients_fragment', id=f.uuid) }}"
@@ -158,6 +160,10 @@
                 </button>
                 </div>
               </div>
+
+              {% if f.review_state in ('draft', 'pending-review') %}
+              <div class="qa-review-output mb-2" role="status" aria-live="polite"></div>
+              {% endif %}
 
               <div class="row g-3">
                 <div class="col-lg-8">
@@ -375,6 +381,7 @@
 
 {% block scripts %}
 {% include "_markdown_js.html" %}
+{% include "_qa_review_js.html" %}
 <script>
 (function() {
   // Preview row toggle

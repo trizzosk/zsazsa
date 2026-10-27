@@ -335,11 +335,10 @@ def _run_briefing_draft_job(job_id: str, briefing_uuid: str, with_summary: bool,
             gone = "The briefing could not be loaded."
             job_store.update_job(job_id, status="failed", error=gone, message=gone)
             return
-        # Published between the save that started this job and now: what was
-        # approved stays as it is.
+        # A review decision made after the save must not be overwritten.
         if briefing.review_state != misp_store.BRIEFING_REVIEW_DRAFT:
-            published = "The briefing was published before drafting began, so nothing was drafted."
-            job_store.update_job(job_id, status="failed", error=published, message=published)
+            moved = f"The briefing is {briefing.review_state}, so nothing was drafted."
+            job_store.update_job(job_id, status="failed", error=moved, message=moved)
             return
 
         stories = [dict(vars(s)) for s in briefing.stories]
@@ -403,7 +402,7 @@ def _run_briefing_draft_job(job_id: str, briefing_uuid: str, with_summary: bool,
             # the model was drafting must not be undone by this write.
             misp_store.update_briefing(briefing_uuid, data, expected_state=briefing.review_state)
         except misp_store.BriefingStateChanged:
-            moved = ("The briefing was published while the stories were being drafted, "
+            moved = ("The briefing's review state changed while the stories were being drafted, "
                      "so the drafts were not saved over it.")
             job_store.update_job(job_id, status="failed", error=moved, message=moved)
             return

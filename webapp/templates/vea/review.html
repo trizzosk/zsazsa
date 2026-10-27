@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_product_actions.html" import preview_button, approval_form with context %}
+{% from "_product_actions.html" import preview_button, approval_form, review_checks, delete_rejected_form with context %}
 {% from "_macros.html" import audience_badges %}
 {% from "_sort_header.html" import sort_th with context %}
 
@@ -41,6 +41,7 @@
             {% endif %}
           </div>
         </form>
+        {{ delete_rejected_form(url_for('vea.delete_rejected'), rejected_count) }}
       </div>
       {% if state_counts or exploitation_counts or tlp_counts or audience_counts %}
       <div class="col-lg-9 list-stats">
@@ -153,18 +154,19 @@
         {# ── Expandable preview row ── #}
         <tr id="vea-preview-{{ v.uuid }}" style="display:none;">
           <td colspan="8" class="p-0">
-            <div style="background:var(--surface-muted);border-top:1px solid var(--border-light);padding:1rem 1.25rem;">
+            <div class="qa-review-block" style="background:var(--surface-muted);border-top:1px solid var(--border-light);padding:1rem 1.25rem;">
 
-              <div class="d-flex align-items-center gap-3 mb-3">
+              <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
                 <span class="req-id-badge">{{ v.vea_id }}</span>
                 {% if v.cve_id %}<code class="small">{{ v.cve_id }}</code>{% endif %}
                 <span class="tlp-badge tlp-{{ v.tlp | slug }}">TLP:{{ v.tlp | upper }}</span>
                 {% if v.audience %}<span class="text-muted small">{{ v.audience }}</span>{% endif %}
                 {% if v.cvss %}<span class="badge bg-secondary">{{ v.cvss }}</span>{% endif %}
                 {% if v.cisa_kev == 'Yes' %}<span class="badge bg-danger">CISA KEV</span>{% endif %}
-                <div class="d-flex align-items-center gap-2 ms-auto">
+                <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
                 {% if v.review_state in ('draft', 'pending-review') %}
                 {{ approval_form(url_for('vea.approve', id=v.uuid), can_publish, (v.audience or '') | trim) }}
+                {{ review_checks('vea', v.uuid, url_for('vea.reject', id=v.uuid)) }}
                 {% endif %}
                 <button type="button" class="btn btn-xs btn-outline-secondary"
                         data-recipients-url="{{ url_for('vea.recipients_fragment', id=v.uuid) }}"
@@ -173,6 +175,10 @@
                 </button>
                 </div>
               </div>
+
+              {% if v.review_state in ('draft', 'pending-review') %}
+              <div class="qa-review-output mb-2" role="status" aria-live="polite"></div>
+              {% endif %}
 
               <div class="row g-3">
                 <div class="col-lg-8">
@@ -293,6 +299,7 @@
 
 {% block scripts %}
 {% include "_markdown_js.html" %}
+{% include "_qa_review_js.html" %}
 <script>
 (function() {
   document.querySelectorAll('.preview-toggle-btn').forEach(function(btn) {

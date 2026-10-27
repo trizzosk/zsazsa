@@ -4,6 +4,8 @@
 
 ### Added
 
+- Daily briefings have a rejected state, an optional rejection reason and a bulk-delete action for rejected briefings. The reason is shown in Metadata.
+- Flash intel and advisory list previews offer rejection with an optional reason and the existing QA check against source. Each overview can delete all rejected products after confirmation.
 - Detection engineering requests can be approved from the status board's "Approve first" button. It opens an inline review in the table, and approval refreshes the board.
 - Support for Microsoft Teams as a notification channel.
 - The stakeholder form has an icon next to "Products subscribed" that subscribes the stakeholder to every product, or clears the list.
@@ -20,6 +22,7 @@
 
 ### Changed
 
+- Rejection in flash intel and advisory previews opens a compact form beneath the button. QA checks show a spinner and a reminder to keep the page open for the result.
 - Product edit forms share the same draft action styling and no longer offer "Publish & notify". Draft products have a distinct "Preview and approve" action. Detection requests keep "Approve first" until approved, and only then show the normal Preview action. The new threat actor profile form no longer has a Recipients button.
 - The detection request marks Audience as required. The threat actor profile form explains the audience requirement and shows a warning while none is selected.
 - The detection request's Engineering status card.
@@ -54,6 +57,8 @@
 
 ### Fixed
 
+- Bulk deletion checks the review state again on the event being deleted, so a product that is no longer rejected is not removed.
+- A stale approval form cannot publish a rejected briefing. Inline briefing approval also asks for confirmation when its summary is out of date, as the detail page does.
 - A PIR or GIR match from another MISP server or a manual source showed "Event not found" when opened from the scope preview or the PIR's recent matches. The link now names the source.
 - Threat actor profiles without an audience cannot be published, including older drafts. Unapproved detection requests still offer inline approval when their engineering status is no longer Pending.
 - Feedback from the threat actor profile, flash intel alert, vulnerability advisory, detection engineering request and daily briefing lists keeps the application's mount path, such as `/zsazsa`, instead of submitting outside it.
@@ -75,6 +80,7 @@
 
 ### Upgrading
 
+- The `zsazsa-daily-briefing` object template is now version 6 with a `rejection-reason` attribute. Nothing needs doing; existing briefings keep their state and have no rejection reason until rejected.
 - zsazsa no longer runs on Python 3.10. `venv/bin/python --version` in the installation directory shows which one it uses. On 3.10, install Python 3.11 or later, move the old `venv` aside, create a new one as the web user with `python3.11 -m venv venv` (or the newer version you installed), and run `venv/bin/pip install -r requirements.txt` in it before restarting. The Docker installation runs its own Python 3.12 and needs nothing.
 - Nothing needs doing for the scope item notes. A note already stored stays in MISP, unread, until the requirement's scope is saved again, which writes its items without one.
 - Existing notification channels keep working, and the `NOTIFICATION_CHANNELS` format is unchanged apart from the new `teams` type.

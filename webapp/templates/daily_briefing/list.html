@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_product_actions.html" import preview_button, approval_form with context %}
+{% from "_product_actions.html" import preview_button, approval_form, rejection_button, delete_rejected_form with context %}
 {% from "_sort_header.html" import sort_th with context %}
 {% from "_macros.html" import ai_job_badge, story_scope %}
 
@@ -28,6 +28,7 @@
             {% endif %}
           </div>
         </form>
+        {{ delete_rejected_form(url_for('daily_briefing.delete_rejected'), rejected_count) }}
       </div>
       {% if state_counts or tlp_counts %}
       <div class="col-lg-9 list-stats">
@@ -72,6 +73,7 @@
           <td><span class="tlp-badge tlp-{{ b.tlp | slug }}">TLP:{{ b.tlp | upper }}</span></td>
           <td>
             {% if b.review_state == 'published' %}<span class="badge bg-success">published</span>
+            {% elif b.review_state == 'rejected' %}<span class="badge bg-danger">rejected</span>
             {% else %}<span class="badge bg-secondary">draft</span>{% endif %}
             {{ ai_job_badge(ai_jobs.get(b.uuid)) }}
           </td>
@@ -125,9 +127,11 @@
         <tr id="briefing-preview-{{ b.uuid }}" style="display:none;">
           <td colspan="8" class="p-0">
             <div class="px-4 py-3" style="background:var(--surface-muted);border-top:1px solid var(--border-light);">
-              <div class="d-flex align-items-center justify-content-end gap-2 mb-3">
+              <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 mb-3">
                 {% if b.review_state == 'draft' %}
-                {{ approval_form(url_for('daily_briefing.publish', id=b.uuid), can_publish) }}
+                {{ approval_form(url_for('daily_briefing.publish', id=b.uuid), can_publish,
+                                 confirmation='The briefing summary is marked out of date. Send it to stakeholders anyway?' if b.summary_stale else None) }}
+                {{ rejection_button('briefing', b.uuid, url_for('daily_briefing.reject', id=b.uuid)) }}
                 {% endif %}
                 <button type="button" class="btn btn-xs btn-outline-secondary"
                         data-recipients-url="{{ url_for('daily_briefing.recipients_fragment', id=b.uuid) }}"

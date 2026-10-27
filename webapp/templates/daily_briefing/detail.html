@@ -170,6 +170,7 @@
           <dt class="col-5">State</dt>
           <dd class="col-7">
             {% if briefing.review_state == 'published' %}<span class="badge bg-success">published</span>
+            {% elif briefing.review_state == 'rejected' %}<span class="badge bg-danger">rejected</span>
             {% else %}<span class="badge bg-secondary">draft</span>{% endif %}
             {{ ai_job_badge(ai_job) }}
           </dd>
@@ -182,6 +183,9 @@
           </dd>
           {% endif %}
         </dl>
+        {% if briefing.review_state == 'rejected' and briefing.rejection_reason %}
+        <p class="mb-0 mt-2 small text-danger" style="white-space:pre-wrap;"><strong>Rejection reason:</strong><br>{{ briefing.rejection_reason }}</p>
+        {% endif %}
         {% if briefing.history_url %}
         <p class="mb-0 mt-2 small">
           <a href="{{ briefing.history_url }}" target="_blank" rel="noopener" class="text-decoration-none">
@@ -194,7 +198,7 @@
 
     {% if briefing.review_state == 'draft' %}
     <div class="card content-card mb-3">
-      <div class="card-header"><strong>Publish</strong></div>
+      <div class="card-header"><strong>Review actions</strong></div>
       <div class="card-body">
         {% if not can_publish %}
         <p class="small text-muted mb-2">Publishing will notify subscribed stakeholders.</p>
@@ -220,6 +224,17 @@
           </button>
         </form>
         {% endif %}
+        <form method="post" action="{{ url_for('daily_briefing.reject', id=briefing.uuid) }}" class="mt-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label for="briefing-rejection-reason" class="form-label small">
+            Rejection reason <span class="text-muted">(optional)</span>
+          </label>
+          <textarea id="briefing-rejection-reason" name="reason"
+                    class="form-control form-control-sm mb-2" rows="2"></textarea>
+          <button type="submit" class="btn btn-outline-danger w-100">
+            <i class="fas fa-xmark me-1"></i> Reject
+          </button>
+        </form>
       </div>
     </div>
     {% endif %}

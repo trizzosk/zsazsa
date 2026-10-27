@@ -181,6 +181,12 @@ On the status board, **Approve first** opens the request in the table below. Use
 
 The flash intel alert, vulnerability advisory and detection request forms save drafts or submit them for review rather than publishing while editing. Threat actor profiles save drafts. On the briefing, flash intel alert, vulnerability advisory and threat actor profile lists, **Preview and approve** opens a draft inline. **Approve & publish** is beside **Recipients** at the top of the preview and requires MISP publish rights. Published products keep the normal Preview action. Detection requests use **Approve first** before approval and show Preview only once approved.
 
+Flash intel and advisory previews also offer **QA check against source** and **Reject**, with an optional rejection reason. Rejection returns to the list. **Delete all rejected products** in each list's overview permanently deletes every rejected product of that type, regardless of the current filters, after confirmation. Drafts, products awaiting review and published products are kept.
+
+Daily briefings can also be rejected from their preview or detail page, with an optional reason shown in Metadata. Rejected briefings have their own review-state filter and chart segment. **Delete all rejected products** in the briefing overview removes rejected briefings only, after confirmation, regardless of the current filters. Published briefings cannot be rejected.
+
+The QA check runs as a page request, not a background job. Keep the page open to read its result. Leaving the page loses the result even if the server finishes the check; the audit log records the verdict, not the full findings.
+
 ![docs/der1.png](docs/der1.png)
 
 A request is reviewed and approved like any other product. After that it moves along an engineering board (similar to intelligence

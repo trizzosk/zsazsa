@@ -1140,12 +1140,16 @@ def _zsazsa_event(uuid, object_name, tag):
     return event
 
 
-def _delete_record(uuid, object_name, tag, label):
+def _delete_record(uuid, object_name, tag, label, expected_state=None):
     """Delete a record's event with zsazsa's service key, never any other event,
     and return it as it was."""
     event = _zsazsa_event(uuid, object_name, tag)
     if event is None:
         raise ValueError(f"{label} {uuid} not found")
+    if expected_state is not None:
+        state = _obj_attr(_get_obj(event, object_name), "review-state")
+        if state != expected_state:
+            raise ValueError(f"{label} {uuid} is not {expected_state}; it was not deleted.")
     _check(_misp().delete_event(uuid), f"delete {label}")
     return event
 
@@ -5383,8 +5387,9 @@ def reject_fia(uuid, reason=""):
     set_fia_review_state(uuid, FIA_REVIEW_REJECTED, reason=reason)
 
 
-def delete_fia(uuid):
-    fia = _fia_ns(_delete_record(uuid, "zsazsa-flash-intel", config.TAG_FLASH_INTEL, "FIA"))
+def delete_fia(uuid, expected_state=None):
+    fia = _fia_ns(_delete_record(
+        uuid, "zsazsa-flash-intel", config.TAG_FLASH_INTEL, "FIA", expected_state=expected_state))
     _retag_product_sources("flash-intel", _sources_of(fia), {}, flash_intel_source_uuids)
 
 
@@ -6222,8 +6227,9 @@ def reject_vea(uuid, reason=""):
     set_vea_review_state(uuid, VEA_REVIEW_REJECTED, reason=reason)
 
 
-def delete_vea(uuid):
-    vea = _vea_ns(_delete_record(uuid, "zsazsa-vea", config.TAG_VEA, "VEA"))
+def delete_vea(uuid, expected_state=None):
+    vea = _vea_ns(_delete_record(
+        uuid, "zsazsa-vea", config.TAG_VEA, "VEA", expected_state=expected_state))
     _retag_product_sources("vea", _sources_of(vea), {}, _vea_source_uuids)
 
 
@@ -6626,7 +6632,8 @@ def extract_source_url(event) -> str:
 
 BRIEFING_REVIEW_DRAFT = "draft"
 BRIEFING_REVIEW_PUBLISHED = "published"
-BRIEFING_REVIEW_STATES = [BRIEFING_REVIEW_DRAFT, BRIEFING_REVIEW_PUBLISHED]
+BRIEFING_REVIEW_REJECTED = "rejected"
+BRIEFING_REVIEW_STATES = [BRIEFING_REVIEW_DRAFT, BRIEFING_REVIEW_PUBLISHED, BRIEFING_REVIEW_REJECTED]
 
 _STORY_REPORT_PREFIX = "[story-"
 
@@ -6638,6 +6645,7 @@ def _briefing_obj(data):
     _oa(obj, "author", data.get("author"))
     _oa(obj, "tlp", data.get("tlp", "clear"))
     _oa(obj, "review-state", data.get("review_state", BRIEFING_REVIEW_DRAFT))
+    _oa(obj, "rejection-reason", data.get("rejection_reason"))
     count = data["story_count"] if "story_count" in data else len(data.get("stories", []))
     _oa(obj, "story-count", str(count))
     _oa(obj, "escalations", data.get("escalations"))
@@ -6673,7 +6681,7 @@ BRIEFING_FIELDS = (
     "escalations", "notes", "detection_rules", "summary", "summary_stale",
     "geographic_scope", "sectors", "threat_actors", "mitre_attack_techniques",
     "threat_types", "technology", "vendor", "incident", "campaign",
-    "creator", "approved_by",
+    "creator", "approved_by", "rejection_reason",
 )
 
 
@@ -6707,6 +6715,7 @@ def _briefing_ns(event):
         author=g("author"),
         tlp=g("tlp") or "clear",
         review_state=g("review-state") or BRIEFING_REVIEW_DRAFT,
+        rejection_reason=g("rejection-reason"),
         story_count=int(g("story-count") or "0"),
         escalations=g("escalations"),
         notes=g("notes"),
@@ -7091,7 +7100,7 @@ def create_briefing(data):
     return uuid
 
 
-# update_briefing and publish_briefing each read the briefing, decide, and
+# Updates, publishing and rejection each read the briefing, decide, and
 # write it back. Two of them overlapping (the drafting job saving while an
 # analyst publishes) would otherwise let the later write undo the earlier one.
 # zsazsa runs as one process (INSTALL.md), so a process lock is enough.
@@ -7129,6 +7138,7 @@ def _update_briefing(uuid, data, expected_state):
     if old:
         data["creator"] = _obj_attr(old, "creator") or ""
         data.setdefault("approved_by", _obj_attr(old, "approved-by") or "")
+        data.setdefault("rejection_reason", _obj_attr(old, "rejection-reason") or "")
     _sync_object_attributes(misp, event, "zsazsa-daily-briefing", _briefing_obj(data), "briefing")
 
     _delete_briefing_reports(misp, event)
@@ -7156,6 +7166,8 @@ def _publish_briefing(uuid):
     if event is None:
         raise RuntimeError(f"Briefing event {uuid} not found")
     briefing = _briefing_ns(event)
+    if briefing.review_state == BRIEFING_REVIEW_REJECTED:
+        raise BriefingStateChanged("Rejected briefings cannot be published.")
 
     # The object is written whole, so everything it holds has to be kept;
     # only the review state and the approver change here.
@@ -7176,9 +7188,30 @@ def _publish_briefing(uuid):
     return publish_event(misp, uuid, f"briefing {uuid}")
 
 
-def delete_briefing(uuid):
-    briefing = _briefing_ns(_delete_record(uuid, "zsazsa-daily-briefing", config.TAG_BRIEFING, "briefing"))
-    _retag_product_sources("daily-briefing", _briefing_sources(briefing.stories), {}, _briefing_source_uuids)
+def delete_briefing(uuid, expected_state=None):
+    with _briefing_write_lock:
+        briefing = _briefing_ns(_delete_record(
+            uuid, "zsazsa-daily-briefing", config.TAG_BRIEFING, "briefing", expected_state=expected_state))
+        _retag_product_sources("daily-briefing", _briefing_sources(briefing.stories), {}, _briefing_source_uuids)
+
+
+def reject_briefing(uuid, reason=""):
+    with _briefing_write_lock:
+        misp = _misp()
+        event = _zsazsa_event(uuid, "zsazsa-daily-briefing", config.TAG_BRIEFING)
+        if event is None:
+            raise RuntimeError(f"Briefing event {uuid} not found")
+        briefing = _briefing_ns(event)
+        if briefing.review_state == BRIEFING_REVIEW_PUBLISHED:
+            raise BriefingStateChanged("Published briefings cannot be rejected.")
+        data = {field: getattr(briefing, field) for field in BRIEFING_FIELDS}
+        data["review_state"] = BRIEFING_REVIEW_REJECTED
+        data["rejection_reason"] = reason
+        _sync_object_attributes(misp, event, "zsazsa-daily-briefing", _briefing_obj(data), "briefing")
+        for tag in list(getattr(event, "tags", []) or []):
+            if tag.name.startswith("workflow:state="):
+                _check(misp.untag(event.uuid, tag.name), "remove briefing workflow state")
+        _check(misp.tag(event.uuid, 'workflow:state="rejected"', local=True), "reject briefing workflow state")
 
 
 def scraper_existing_uuids(uuids):

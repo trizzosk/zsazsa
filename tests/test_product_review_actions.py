@@ -208,6 +208,198 @@ class ProductReviewActions(unittest.TestCase):
                 self.assertEqual(page.select_one(".preview-toggle-btn")["title"], "Preview")
                 self.assertIsNone(page.select_one(".inline-approval-form"))
 
+    def test_alert_and_advisory_previews_offer_qa_and_optional_rejection(self):
+        for _module, path, listing, parser, _getter, _publisher, _field, _published, _action in PRODUCTS[:2]:
+            kind = "fia" if parser == "_fia_ns" else "vea"
+            for state in ("draft", "pending-review", "approved", "rejected"):
+                with self.subTest(path=path, state=state):
+                    product = _product(parser)
+                    product.review_state = state
+                    with mock.patch.object(misp_store, listing, return_value=[product]):
+                        page = BeautifulSoup(
+                            self.client.get(path + "/", headers=self.headers).data, "html.parser")
+                    row = page.select_one(f"#{kind}-preview-{UUID}")
+                    qa = row.select_one(".qa-review-btn")
+                    rejection = row.select_one(".inline-rejection-form")
+                    if state in ("approved", "rejected"):
+                        self.assertIsNone(qa)
+                        self.assertIsNone(rejection)
+                        continue
+                    self.assertEqual(qa["data-kind"], kind)
+                    self.assertEqual(qa["data-uuid"], UUID)
+                    self.assertIsNotNone(qa.find_parent(class_="qa-review-block")
+                                         .select_one(".qa-review-output"))
+                    self.assertIn("btn-xs", qa["class"])
+                    self.assertEqual(rejection["action"], f"/zsazsa{path}/{UUID}/reject")
+                    self.assertEqual(rejection.select_one("[name=csrf_token]")["value"], "test-token")
+                    self.assertEqual(rejection.select_one("[name=return_to]")["value"], "review")
+                    reason = rejection.select_one("textarea[name=reason]")
+                    self.assertFalse(reason.has_attr("required"))
+                    self.assertIsNotNone(rejection.select_one(f'label[for="{reason["id"]}"]'))
+                    toggle = row.select_one(f'[aria-controls="{rejection.parent["id"]}"]')
+                    self.assertEqual(toggle.get_text(strip=True), "Reject")
+                    self.assertIn("btn-xs", toggle["class"])
+                    self.assertEqual(toggle["data-bs-toggle"], "dropdown")
+                    self.assertEqual(toggle.parent, rejection.parent.parent)
+                    self.assertIn("dropdown-menu", rejection.parent["class"])
+                    self.assertIn("width:20rem", rejection.parent["style"])
+                    self.assertIn("p-2", rejection["class"])
+                    self.assertEqual(reason["rows"], "2")
+                    self.assertIsNotNone(rejection.select_one("button[type=button]"))
+                    self.assertTrue(any("QA review did not complete" in (script.string or "")
+                                        for script in page.find_all("script")))
+
+    def test_inline_rejection_reuses_the_existing_workflow_and_returns_to_the_list(self):
+        for module, path, _listing, parser, getter, _publisher, _field, _published, _action in PRODUCTS[:2]:
+            kind = "fia" if parser == "_fia_ns" else "vea"
+            for reason in ("", "  Source does not support this claim.  "):
+                with self.subTest(path=path, reason=reason), \
+                     mock.patch.object(misp_store, getter, return_value=_product(parser)), \
+                     mock.patch.object(misp_store, f"reject_{kind}") as reject:
+                    self.can_publish.return_value = False
+                    response = self.client.post(
+                        f"{path}/{UUID}/reject", headers=self.headers,
+                        data={"csrf_token": "test-token", "return_to": "review", "reason": reason})
+                    self.assertEqual(response.location, f"/zsazsa{path}/")
+                    reject.assert_called_once_with(UUID, reason=reason.strip())
+                    module.audit.record.assert_called_with(
+                        "reject", kind, entity_id=UUID, entity_label=getattr(_product(parser), f"{kind}_id"))
+
+    def test_rejection_protects_published_products_and_preserves_detail_redirects(self):
+        for _module, path, _listing, parser, getter, _publisher, _field, _published, _action in PRODUCTS[:2]:
+            kind = "fia" if parser == "_fia_ns" else "vea"
+            for state in ("draft", "approved", None):
+                for return_to in ("review", "", "https://example.org/"):
+                    with self.subTest(path=path, state=state, return_to=return_to):
+                        product = _product(parser) if state else None
+                        if product:
+                            product.review_state = state
+                        with mock.patch.object(misp_store, getter, return_value=product), \
+                             mock.patch.object(misp_store, f"reject_{kind}") as reject:
+                            response = self.client.post(
+                                f"{path}/{UUID}/reject", headers=self.headers,
+                                data={"csrf_token": "test-token", "return_to": return_to})
+                        self.assertEqual(reject.call_count, int(state == "draft"))
+                        if state is None:
+                            self.assertEqual(response.status_code, 404)
+                        else:
+                            target = "/" if return_to == "review" else f"/{UUID}"
+                            self.assertEqual(response.location, f"/zsazsa{path}{target}")
+
+    def test_inline_rejection_surfaces_errors_and_requires_csrf(self):
+        for _module, path, _listing, parser, getter, _publisher, _field, _published, _action in PRODUCTS[:2]:
+            kind = "fia" if parser == "_fia_ns" else "vea"
+            with self.subTest(path=path), \
+                 mock.patch.object(misp_store, getter, return_value=_product(parser)), \
+                 mock.patch.object(misp_store, f"reject_{kind}",
+                                   side_effect=RuntimeError("MISP unavailable")) as reject:
+                response = self.client.post(
+                    f"{path}/{UUID}/reject", headers=self.headers,
+                    data={"csrf_token": "test-token", "return_to": "review"})
+                self.assertEqual(response.location, f"/zsazsa{path}/")
+                with self.client.session_transaction() as session:
+                    messages = session.pop("_flashes", [])
+                self.assertTrue(any("MISP unavailable" in text for _category, text in messages))
+                reject.reset_mock()
+                self.assertEqual(self.client.post(f"{path}/{UUID}/reject").status_code, 403)
+                reject.assert_not_called()
+
+    def test_bulk_delete_counts_all_rejected_products_even_when_the_list_is_filtered(self):
+        for _module, path, listing, parser, _getter, _publisher, _field, _published, _action in PRODUCTS[:2]:
+            with self.subTest(path=path):
+                draft, rejected = _product(parser), _product(parser)
+                rejected.uuid = "rejected-product"
+                rejected.review_state = "rejected"
+                for products, count in (([draft, rejected], 1), ([draft], 0)):
+                    with mock.patch.object(misp_store, listing, return_value=products):
+                        page = BeautifulSoup(
+                            self.client.get(path + "/?state=draft", headers=self.headers).data,
+                            "html.parser")
+                    form = page.select_one(f'form[action="/zsazsa{path}/rejected/delete"]')
+                    self.assertIsNotNone(form)
+                    self.assertIsNone(form.find_parent("form"))
+                    self.assertEqual(form["method"], "post")
+                    self.assertIn("regardless of the current filters", form["data-submit-confirm"])
+                    self.assertEqual(form.select_one("[name=csrf_token]")["value"], "test-token")
+                    button = form.select_one("button")
+                    self.assertIn("Delete all rejected products", button.get_text())
+                    self.assertEqual(button.has_attr("disabled"), count == 0)
+                    self.assertIn(str(count), button.get_text())
+
+    def test_bulk_delete_only_removes_products_that_are_still_rejected(self):
+        for module, path, listing, parser, getter, _publisher, _field, _published, _action in PRODUCTS[:2]:
+            kind = "fia" if parser == "_fia_ns" else "vea"
+            candidates = []
+            current = {}
+            for index, state in enumerate(("rejected", "approved", "draft", "pending-review", None)):
+                product = _product(parser)
+                product.uuid = f"candidate-{index}"
+                product.review_state = "rejected"
+                candidates.append(product)
+                current[product.uuid] = SimpleNamespace(review_state=state) if state else None
+            with self.subTest(path=path), \
+                 mock.patch.object(misp_store, listing, return_value=candidates) as listing_mock, \
+                 mock.patch.object(misp_store, getter, side_effect=current.get), \
+                 mock.patch.object(misp_store, f"delete_{kind}") as delete:
+                self.can_publish.return_value = False
+                module.audit.record.reset_mock()
+                response = self.client.post(
+                    path + "/rejected/delete", headers=self.headers, data={"csrf_token": "test-token"})
+                self.assertEqual(response.location, f"/zsazsa{path}/")
+                listing_mock.assert_called_once_with(review_state="rejected")
+                delete.assert_called_once_with("candidate-0", expected_state="rejected")
+                module.audit.record.assert_called_once_with(
+                    "delete", kind, entity_id="candidate-0",
+                    entity_label=getattr(candidates[0], f"{kind}_id"))
+
+    def test_bulk_delete_reports_errors_and_requires_post_and_csrf(self):
+        for _module, path, listing, parser, getter, _publisher, _field, _published, _action in PRODUCTS[:2]:
+            kind = "fia" if parser == "_fia_ns" else "vea"
+            rejected = _product(parser)
+            rejected.review_state = "rejected"
+            for listing_error in (False, True):
+                with self.subTest(path=path, listing_error=listing_error), \
+                     mock.patch.object(misp_store, listing, return_value=[rejected],
+                                       side_effect=RuntimeError("MISP unavailable") if listing_error else None), \
+                     mock.patch.object(misp_store, getter, return_value=rejected), \
+                     mock.patch.object(misp_store, f"delete_{kind}",
+                                       side_effect=RuntimeError("Delete refused")) as delete:
+                    response = self.client.post(
+                        path + "/rejected/delete", headers=self.headers, data={"csrf_token": "test-token"})
+                    self.assertEqual(response.location, f"/zsazsa{path}/")
+                    with self.client.session_transaction() as session:
+                        messages = session.pop("_flashes", [])
+                    error = "MISP unavailable" if listing_error else "Delete refused"
+                    self.assertTrue(any(error in text for _category, text in messages))
+                    delete.reset_mock()
+                    self.assertEqual(self.client.post(path + "/rejected/delete").status_code, 403)
+                    self.assertEqual(self.client.get(path + "/rejected/delete").status_code, 405)
+                    delete.assert_not_called()
+
+    def test_bulk_delete_continues_after_a_failure_and_audits_only_deletions(self):
+        for module, path, listing, parser, getter, _publisher, _field, _published, _action in PRODUCTS[:2]:
+            kind = "fia" if parser == "_fia_ns" else "vea"
+            failed, deleted = _product(parser), _product(parser)
+            for index, product in enumerate((failed, deleted)):
+                product.uuid = f"rejected-{index}"
+                product.review_state = "rejected"
+            with self.subTest(path=path), \
+                 mock.patch.object(misp_store, listing, return_value=[failed, deleted]), \
+                 mock.patch.object(misp_store, getter, return_value=deleted), \
+                 mock.patch.object(misp_store, f"delete_{kind}",
+                                   side_effect=[RuntimeError("Delete refused"), None]) as delete:
+                module.audit.record.reset_mock()
+                self.client.post(path + "/rejected/delete", data={"csrf_token": "test-token"})
+                self.assertEqual(delete.call_args_list,
+                                 [mock.call(failed.uuid, expected_state="rejected"),
+                                  mock.call(deleted.uuid, expected_state="rejected")])
+                module.audit.record.assert_called_once_with(
+                    "delete", kind, entity_id=deleted.uuid, entity_label=getattr(deleted, f"{kind}_id"))
+                with self.client.session_transaction() as session:
+                    messages = session.pop("_flashes", [])
+                self.assertTrue(any("Delete refused" in text for _category, text in messages))
+                self.assertTrue(any("Deleted 1 rejected" in text for _category, text in messages))
+
     def test_a_product_with_a_required_audience_cannot_be_approved_without_one(self):
         for _module, path, listing, parser, getter, publisher, _field, _published, action in PRODUCTS[:3]:
             with self.subTest(path=path):

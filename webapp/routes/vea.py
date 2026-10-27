@@ -171,6 +171,7 @@ def review():
     return render_template(
         "vea/review.html",
         veas=veas,
+        rejected_count=sum(v.review_state == misp_store.VEA_REVIEW_REJECTED for v in all_veas),
         exploitation={v.uuid: _exploitation(v) for v in veas},
         state_filter=state_filter,
         exploitation_filter=exploitation_filter,
@@ -456,13 +457,15 @@ def approve(id):
 
 @bp.route("/<string:id>/reject", methods=["POST"])
 def reject(id):
+    return_url = (url_for("vea.review") if request.form.get("return_to") == "review"
+                  else url_for("vea.detail", id=id))
     vea = misp_store.get_vea(id)
     if vea is None:
         return "VEA not found", 404
     # Rejecting a published advisory would make it editable and deletable again.
     if vea.review_state == misp_store.VEA_REVIEW_APPROVED:
         flash("Published advisories cannot be rejected.", "warning")
-        return redirect(url_for("vea.detail", id=id))
+        return redirect(return_url)
     reason = request.form.get("reason", "").strip()
     try:
         misp_store.reject_vea(id, reason=reason)
@@ -470,7 +473,30 @@ def reject(id):
         flash(f"{vea.vea_id} rejected.", "info")
     except Exception as exc:
         flash(f"Could not reject VEA: {exc}", "warning")
-    return redirect(url_for("vea.detail", id=id))
+    return redirect(return_url)
+
+
+@bp.route("/rejected/delete", methods=["POST"])
+def delete_rejected():
+    deleted = 0
+    try:
+        rejected = misp_store.list_veas(review_state=misp_store.VEA_REVIEW_REJECTED)
+    except Exception as exc:
+        flash(f"Could not list rejected advisories: {exc}", "warning")
+        return redirect(url_for("vea.review"))
+    for vea in rejected:
+        try:
+            current = misp_store.get_vea(vea.uuid)
+            if current is None or current.review_state != misp_store.VEA_REVIEW_REJECTED:
+                continue
+            misp_store.delete_vea(vea.uuid, expected_state=misp_store.VEA_REVIEW_REJECTED)
+            deleted += 1
+            audit.record("delete", "vea", entity_id=vea.uuid, entity_label=vea.vea_id)
+        except Exception as exc:
+            flash(f"Could not delete {vea.vea_id}: {exc}", "warning")
+    flash(f"Deleted {deleted} rejected advisor{'ies' if deleted != 1 else 'y'}.",
+          "success" if deleted else "info")
+    return redirect(url_for("vea.review"))
 
 
 @bp.route("/<string:id>/delete", methods=["POST"])
