@@ -3,8 +3,9 @@
 Each flow is static apart from what is pinned here. The analyser line follows
 the schedule settings: the briefing's hour, the alert checks that are switched
 on, whether advisories are scheduled. The advisory flow says whether the asset
-inventory is on, and the detection request flow whether Rulezet is. Links to the settings pages are only shown to site admins,
-since those pages refuse everyone else. Each list route passes the settings in.
+inventory is on, and the detection request flow whether Rulezet is. Links to
+the settings pages are only shown to site admins, since those pages refuse
+everyone else. Each list route passes the settings in.
 
     python -m unittest tests.test_product_flows
 """

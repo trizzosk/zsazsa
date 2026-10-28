@@ -61,6 +61,7 @@
 
 ### Fixed
 
+- Changing a product's TLP left its MISP event with the old TLP tag, except on flash intel alerts, and threat actor profiles and indicator feeds had none at all. Saving a product now sets it.
 - A PIR's Collection coverage card counted fewer events than its scope preview, because it left out the ATT&CK techniques. Both now search the same scope values.
 - Bulk deletion checks the review state again on the event being deleted, so a product that is no longer rejected is not removed.
 - A stale approval form cannot publish a rejected briefing. Inline briefing approval also asks for confirmation when its summary is out of date, as the detail page does.
@@ -85,6 +86,7 @@
 
 ### Upgrading
 
+- Threat actor profiles and indicator feeds made before this release have no TLP tag on their MISP event, and a product other than a flash intel alert whose TLP was changed still has its old tag. Saving the product again sets the right one.
 - The `zsazsa-daily-briefing` object template is now version 6 with a `rejection-reason` attribute. Nothing needs doing; existing briefings keep their state and have no rejection reason until rejected.
 - zsazsa no longer runs on Python 3.10. `venv/bin/python --version` in the installation directory shows which one it uses. On 3.10, install Python 3.11 or later, move the old `venv` aside, create a new one as the web user with `python3.11 -m venv venv` (or the newer version you installed), and run `venv/bin/pip install -r requirements.txt` in it before restarting. The Docker installation runs its own Python 3.12 and needs nothing.
 - Nothing needs doing for the scope item notes. A note already stored stays in MISP, unread, until the requirement's scope is saved again, which writes its items without one.

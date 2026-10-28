@@ -673,6 +673,27 @@ def _add_event(misp, event, local_tags=None, label="create event"):
     return result
 
 
+def _sync_tlp_tag(misp, event, tlp):
+    """Leave a product's event with the one TLP tag the product has.
+
+    MISP shares an event by its tags, so a product whose TLP was changed on its
+    form would otherwise leave MISP under the TLP it was created with.
+    """
+    if not tlp:
+        return
+    wanted = f"tlp:{tlp}"
+    current = [t.name for t in getattr(event, "tags", []) or [] if t.name.startswith("tlp:")]
+    for name in current:
+        if name != wanted:
+            r = misp.untag(event.uuid, name)
+            if isinstance(r, dict) and "errors" in r:
+                logger.warning("untag %s from %s: %s", name, event.uuid, r["errors"])
+    if wanted not in current:
+        r = misp.tag(event.uuid, wanted)
+        if isinstance(r, dict) and "errors" in r:
+            logger.warning("tag %s on %s: %s", wanted, event.uuid, r["errors"])
+
+
 def _source_client(source_id: str):
     """The MISP a product's source event is on, when it is ours to tag, or None.
 
@@ -2364,7 +2385,7 @@ def create_indicator_feed(data):
     misp = _misp()
     data["feed_id"] = _reserve_sequence_id(misp, config.TAG_INDICATOR_FEED, "FEED", data.get("feed_id"))
     info = f"[zsazsa:indicator-feed] {data['feed_id']}: {(data.get('name') or '')[:80]}"
-    event = _make_event(info)
+    event = _make_event(info, extra_tags=[f"tlp:{data['tlp']}"])
     result = _add_event(misp, event, [config.TAG_INDICATOR_FEED], "create indicator feed")
     _check(misp.add_object(_event_ref(result), _indicator_feed_obj(data)), "add indicator feed object")
     uuid = _event_uuid(result)
@@ -2387,9 +2408,11 @@ def update_indicator_feed(uuid, data):
         # Keep the capability token stable across edits so saved URLs keep working.
         data.setdefault("token", _obj_attr(old, "token") or secrets.token_urlsafe(16))
         data.setdefault("public_url_enabled", _public_url_enabled(old))
-    _sync_object_attributes(misp, event, "zsazsa-indicator-feed", _indicator_feed_obj(data), "indicator feed")
+    obj = _indicator_feed_obj(data)
+    _sync_object_attributes(misp, event, "zsazsa-indicator-feed", obj, "indicator feed")
     info = f"[zsazsa:indicator-feed] {data.get('feed_id', '')}: {(data.get('name') or '')[:80]}"
     misp.update_event({"Event": {"id": event.id, "info": info}})
+    _sync_tlp_tag(misp, event, _obj_attr(obj, "tlp"))
     return uuid
 
 
@@ -2613,13 +2636,14 @@ def get_threat_actor_profile(uuid):
 def create_threat_actor_profile(data):
     data["creator"] = misp_session.current_user_email()
     data.setdefault("status", "Draft")
+    data.setdefault("tlp", "amber")
     # Text fields are filled interactively via the "complete profile" button;
     # only victimology is recorded server-side (it becomes a note).
     victimology = galaxy_enrichment(data.get("threat_actors") or [])["victimology"]
     misp = _misp()
     data["tap_id"] = _reserve_sequence_id(misp, config.TAG_THREAT_ACTOR_PROFILE, "TAP", data.get("tap_id"))
     info = f"[zsazsa:threat-actor-profile] {data['tap_id']}: {(data.get('title') or '')[:80]}"
-    event = _make_event(info)
+    event = _make_event(info, extra_tags=[f"tlp:{data['tlp']}"])
     result = _add_event(misp, event, [config.TAG_THREAT_ACTOR_PROFILE], "create threat actor profile")
     _check(misp.add_object(_event_ref(result), _tap_obj(data)), "add threat actor profile object")
     uuid = _event_uuid(result)
@@ -2651,9 +2675,11 @@ def update_threat_actor_profile(uuid, data):
     seen = {a.lower() for a in old_actors}
     new_actors = [a for a in (data.get("threat_actors") or []) if a.lower() not in seen]
     victimology = galaxy_enrichment(new_actors)["victimology"]
-    _sync_object_attributes(misp, event, "zsazsa-threat-actor-profile", _tap_obj(data), "threat actor profile")
+    obj = _tap_obj(data)
+    _sync_object_attributes(misp, event, "zsazsa-threat-actor-profile", obj, "threat actor profile")
     info = f"[zsazsa:threat-actor-profile] {data.get('tap_id', '')}: {(data.get('title') or '')[:80]}"
     _apply_scope_tags(misp, uuid, data, new_info=info, _event=event, local=True)
+    _sync_tlp_tag(misp, event, _obj_attr(obj, "tlp"))
     _add_victimology_notes(uuid, victimology)
     return uuid
 
@@ -5274,23 +5300,13 @@ def update_fia(uuid, data):
         data["creator"] = _obj_attr(old, "creator") or ""
         # Only the analyser sets it, when it makes the draft.
         data["analyser_reason"] = _obj_attr(old, "analyser-reason") or ""
-    _sync_object_attributes(misp, event, "zsazsa-flash-intel", _fia_obj(data), "FIA")
+    obj = _fia_obj(data)
+    _sync_object_attributes(misp, event, "zsazsa-flash-intel", obj, "FIA")
 
     title = (data.get("title") or "").strip() or "Untitled"
     misp.update_event({"Event": {"id": event.id, "info": f"[zsazsa:fia] {title}"}})
 
-    # Sync TLP and admiralty tags
-    tlp = data.get("tlp", "amber")
-    for tag in list(getattr(event, "tags", []) or []):
-        if tag.name.startswith("tlp:"):
-            try:
-                misp.untag(event.uuid, tag.name)
-            except Exception as exc:
-                logger.warning("untag %s from %s failed: %s", tag.name, event.uuid, exc)
-    try:
-        misp.tag(event.uuid, f"tlp:{tlp}")
-    except Exception as exc:
-        logger.warning("tag tlp:%s on %s failed: %s", tlp, event.uuid, exc)
+    _sync_tlp_tag(misp, event, _obj_attr(obj, "tlp"))
     for tag in list(getattr(event, "tags", []) or []):
         if tag.name.startswith("admiralty-scale:"):
             try:
@@ -6186,12 +6202,14 @@ def update_vea(uuid, data):
         data["creator"] = _obj_attr(old, "creator") or ""
         # Only the analyser sets it, when it makes the draft.
         data["analyser_reason"] = _obj_attr(old, "analyser-reason") or ""
-    _sync_object_attributes(misp, event, "zsazsa-vea", _vea_obj(data), "VEA")
+    obj = _vea_obj(data)
+    _sync_object_attributes(misp, event, "zsazsa-vea", obj, "VEA")
 
     cve = (data.get("cve_id") or "").strip()
     title = (data.get("title") or cve or "Untitled").strip()
     info = f"[zsazsa:vea] {cve}: {title}" if cve else f"[zsazsa:vea] {title}"
     misp.update_event({"Event": {"id": event.id, "info": info}})
+    _sync_tlp_tag(misp, event, _obj_attr(obj, "tlp"))
 
     refreshed = misp.get_event(uuid, pythonify=True)
     _delete_vea_reports(misp, refreshed)
@@ -6565,10 +6583,12 @@ def update_der(uuid, data):
     data.setdefault("status", (_obj_attr(old, "status") if old else "") or DER_STATUS_PENDING)
     if old:
         data["creator"] = _obj_attr(old, "creator") or ""
-    _sync_object_attributes(misp, event, "zsazsa-detection-eng-request", _der_obj(data), "DER")
+    obj = _der_obj(data)
+    _sync_object_attributes(misp, event, "zsazsa-detection-eng-request", obj, "DER")
 
     title = (data.get("title") or "Untitled").strip()
     misp.update_event({"Event": {"id": event.id, "info": f"[zsazsa:der] {title}"}})
+    _sync_tlp_tag(misp, event, _obj_attr(obj, "tlp"))
 
     refreshed = misp.get_event(uuid, pythonify=True)
     _delete_der_reports(misp, refreshed)
@@ -7152,7 +7172,9 @@ def _update_briefing(uuid, data, expected_state):
         data["creator"] = _obj_attr(old, "creator") or ""
         data.setdefault("approved_by", _obj_attr(old, "approved-by") or "")
         data.setdefault("rejection_reason", _obj_attr(old, "rejection-reason") or "")
-    _sync_object_attributes(misp, event, "zsazsa-daily-briefing", _briefing_obj(data), "briefing")
+    obj = _briefing_obj(data)
+    _sync_object_attributes(misp, event, "zsazsa-daily-briefing", obj, "briefing")
+    _sync_tlp_tag(misp, event, _obj_attr(obj, "tlp"))
 
     _delete_briefing_reports(misp, event)
     for i, story in enumerate(data.get("stories", []), 1):
@@ -7670,9 +7692,11 @@ def update_tlr(uuid, data):
         data.setdefault("corrections", _json_list(_obj_attr(old, "corrections")))
     # In place, as for the other records: deleting the object and adding a new
     # one left a report with no content at all whenever the add failed.
-    _sync_object_attributes(misp, event, "zsazsa-threat-landscape-report", _tlr_obj(data), "TLR")
+    obj = _tlr_obj(data)
+    _sync_object_attributes(misp, event, "zsazsa-threat-landscape-report", obj, "TLR")
     info = f"[zsazsa:tlr] {data.get('tlr_id', '')}: {data.get('title', '')}"
     misp.update_event({"Event": {"id": event.id, "info": info}})
+    _sync_tlp_tag(misp, event, _obj_attr(obj, "tlp"))
     return uuid
 
 

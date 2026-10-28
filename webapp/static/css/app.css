@@ -2432,7 +2432,7 @@ a.chart-row:hover { background: var(--surface-hover); }
 .wizard-summary-icon { color: var(--border-light); font-size: 1.1rem; }
 .wizard-summary li.is-done .wizard-summary-icon { color: var(--accent-green); }
 
-/* ─── How a product is made (briefing, alert, advisory and feed lists) ───── */
+/* ─── How a product is made, on the product lists ────────────────────────── */
 /* The line in the filter box, and the panel it opens */
 .flow-help {
   display: inline-flex; align-items: center; gap: .35rem; margin-top: .5rem; padding: 0;
