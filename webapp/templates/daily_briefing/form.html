@@ -687,7 +687,7 @@ document.addEventListener('click', function(e) {
     removeStoryCard(card);
     renumberStories();
     updateOverlapButtonState();
-    clearOverlapVisuals();
+    refreshOverlapPairs();
     showPaneAfterRemoval(position);
   }
   if (e.target.closest('.btn-draft-story')) {
@@ -1130,7 +1130,7 @@ function autoDeleteExcludedStories() {
   if (removed > 0) {
     renumberStories();
     updateOverlapButtonState();
-    clearOverlapVisuals();
+    refreshOverlapPairs();
     showPaneAfterRemoval(1);
   }
   var statusEl = document.getElementById('overlap-status');
@@ -1154,7 +1154,12 @@ function updateOverlapButtonState() {
     : 'Check whether stories overlap and may describe the same event.';
 }
 
+/* The pairs the last overlap check found, by story card rather than by number,
+   so that they still point at the right stories after one is deleted. */
+var overlapPairs = [];
+
 function clearOverlapVisuals() {
+  overlapPairs = [];
   _getStoryCards().forEach(function(card) {
     card.classList.remove('border', 'border-warning', 'border-2');
   });
@@ -1171,17 +1176,24 @@ function clearOverlapVisuals() {
   refreshRail();
 }
 
-function _highlightOverlapStories(overlaps) {
+/* Names each pair by where its stories are now and marks both cards. A pair
+   that lost a story stays listed, greyed out, until the analyst acknowledges
+   the overview. */
+function refreshOverlapPairs() {
   var cards = _getStoryCards();
-  var toMark = new Set();
-  overlaps.forEach(function(item) {
-    if (item && item.a) toMark.add(item.a);
-    if (item && item.b) toMark.add(item.b);
+  cards.forEach(function(card) {
+    card.classList.remove('border', 'border-warning', 'border-2');
   });
-  toMark.forEach(function(idx) {
-    var card = cards[idx - 1];
-    if (!card) return;
-    card.classList.add('border', 'border-warning', 'border-2');
+  overlapPairs.forEach(function(pair) {
+    var numbers = [cards.indexOf(pair.a) + 1, cards.indexOf(pair.b) + 1];
+    var label = numbers.map(function(n) { return n ? 'Story ' + n : 'a deleted story'; }).join(' and ');
+    pair.item.querySelector('.fw-semibold').textContent = label.charAt(0).toUpperCase() + label.slice(1);
+    var deleted = numbers.indexOf(0) !== -1;
+    pair.item.classList.toggle('opacity-50', deleted);
+    if (!deleted) {
+      pair.a.classList.add('border', 'border-warning', 'border-2');
+      pair.b.classList.add('border', 'border-warning', 'border-2');
+    }
   });
   // Only one story pane is on screen, so the pairs have to show up in the rail
   // as well or half the finding is invisible.
@@ -1198,19 +1210,28 @@ function _renderOverlapResult(data) {
   var overlaps = Array.isArray(data.overlaps) ? data.overlaps.slice() : [];
   overlaps.sort(function(a, b) { return (b.score || 0) - (a.score || 0); });
 
-  statusEl.style.display = '';
   if (!overlaps.length) {
+    statusEl.style.display = '';
     statusEl.textContent = 'No meaningful overlap found between stories.';
-    resultEl.style.display = 'none';
     return;
   }
 
+  // The finding is kept in the card rather than in the status line, which the
+  // exclusions and the next check write to.
   var summary = data.summary ? String(data.summary) : '';
-  statusEl.textContent = 'Potential overlap found in ' + overlaps.length + ' pair' + (overlaps.length === 1 ? '' : 's') + '.' + (summary ? ' ' + summary : '');
-
   resultEl.style.display = '';
-  resultEl.innerHTML = '<div class="card content-card"><div class="card-header"><i class="fas fa-copy me-2"></i>Potential duplicate coverage</div><ul class="list-group list-group-flush"></ul></div>';
+  resultEl.innerHTML = '<div class="card content-card">'
+    + '<div class="card-header d-flex justify-content-between align-items-center">'
+    + '<span><i class="fas fa-copy me-2"></i>Potential duplicate coverage</span>'
+    + '<button type="button" class="btn btn-xs btn-outline-secondary" id="btn-overlap-acknowledge">'
+    + '<i class="fas fa-check me-1"></i>Acknowledge</button></div>'
+    + '<div class="card-body py-2 small text-muted"></div>'
+    + '<ul class="list-group list-group-flush"></ul></div>';
+  resultEl.querySelector('.card-body').textContent = 'Potential overlap found in ' + overlaps.length
+    + ' pair' + (overlaps.length === 1 ? '' : 's') + '.' + (summary ? ' ' + summary : '');
+  resultEl.querySelector('#btn-overlap-acknowledge').addEventListener('click', clearOverlapVisuals);
   var list = resultEl.querySelector('ul');
+  var cards = _getStoryCards();
   // The model writes the pairs and the reason, from scraped article text, so
   // they go in as text.
   overlaps.forEach(function(item) {
@@ -1223,8 +1244,11 @@ function _renderOverlapResult(data) {
     li.querySelector('.small').textContent = item.reason ? String(item.reason) : 'Similar event coverage detected.';
     li.querySelector('.badge').textContent = 'Overlap ' + scorePct + '%';
     list.appendChild(li);
+    if (cards[item.a - 1] && cards[item.b - 1]) {
+      overlapPairs.push({a: cards[item.a - 1], b: cards[item.b - 1], item: li});
+    }
   });
-  _highlightOverlapStories(overlaps);
+  refreshOverlapPairs();
 }
 
 function addStoryCard(idx, title, content, sourceUrl, sourceUuid) {

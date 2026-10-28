@@ -13,5 +13,18 @@
   {% endfor %}
 </div>
 {% else %}
-<p class="text-muted mb-0">No stakeholders are subscribed to Daily threat briefing and cleared for TLP:{{ briefing.tlp | upper }}.</p>
+<p class="text-muted mb-2">No stakeholders are subscribed to Daily threat briefing and cleared for TLP:{{ briefing.tlp | upper }}.</p>
+{% endif %}
+{% if blocked %}
+<h6 class="mb-2 mt-3"><i class="fas fa-circle-exclamation text-warning me-1"></i>Subscribed but blocked <span class="badge bg-warning text-dark rounded-pill">{{ blocked | length }}</span></h6>
+<ul class="list-unstyled mb-0">
+  {% for r in blocked %}
+  <li class="d-flex align-items-center gap-2 mb-2">
+    <span class="badge rounded-pill delivery-blocked px-3 py-2 flex-shrink-0" style="font-size:.82rem;">
+      {{ r.name }}{% if r.role %} <span style="opacity:.65;font-size:.75em;">({{ r.role }})</span>{% endif %}
+    </span>
+    <span class="text-muted small">TLP clearance ({{ r.tlp_clearance or 'amber' }}) is below TLP:{{ briefing.tlp | upper }}</span>
+  </li>
+  {% endfor %}
+</ul>
 {% endif %}

@@ -467,15 +467,25 @@ class ProductReviewActions(unittest.TestCase):
         self.assertTrue(all(classes == save_classes[0] for classes in save_classes))
 
     def test_briefing_recipient_preview_uses_delivery_subscription_and_tlp_rules(self):
+        """A subscriber cleared below the briefing's TLP is listed as blocked,
+        as on the other products, rather than left out without a word."""
         briefing = _product("_briefing_ns")
-        recipient = SimpleNamespace(name="SOC analyst", role="SOC")
+        briefing.tlp = "green"
+        stakeholders = [
+            SimpleNamespace(name="SOC analyst", role="SOC", tlp_clearance="amber",
+                            products=["Daily threat briefing"]),
+            SimpleNamespace(name="Comms", role="Other", tlp_clearance="clear",
+                            products=["Daily threat briefing"]),
+            SimpleNamespace(name="Board", role="CISO / Leadership", tlp_clearance="red", products=[]),
+        ]
         with mock.patch.object(misp_store, "get_briefing", return_value=briefing), \
-             mock.patch.object(misp_store, "stakeholders_cleared_for",
-                               return_value=[recipient]) as recipients:
+             mock.patch.object(misp_store, "list_stakeholders", return_value=stakeholders):
             response = self.client.get(f"/briefing/{UUID}/recipients")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("SOC analyst", response.get_data(as_text=True))
-        recipients.assert_called_once_with("Daily threat briefing", briefing.tlp)
+        page = BeautifulSoup(response.data, "html.parser")
+        self.assertEqual([b.contents[0].strip() for b in page.select(".delivery-ok")], ["SOC analyst"])
+        self.assertEqual([b.contents[0].strip() for b in page.select(".delivery-blocked")], ["Comms"])
+        self.assertIn("TLP clearance (clear) is below TLP:GREEN", page.get_text(" ", strip=True))
         with mock.patch.object(misp_store, "get_briefing", return_value=None):
             self.assertEqual(self.client.get(f"/briefing/{UUID}/recipients").status_code, 404)
 

@@ -5698,6 +5698,12 @@ def stakeholders_cleared_for(product_type: str, tlp: str) -> list:
             if _tlp_cleared(s.tlp_clearance, tlp)]
 
 
+def stakeholders_blocked_by_tlp(product_type: str, tlp: str) -> list:
+    """Subscribers to `product_type` that stakeholders_cleared_for() leaves out."""
+    return [s for s in stakeholders_subscribed_to(product_type)
+            if not _tlp_cleared(s.tlp_clearance, tlp)]
+
+
 def stakeholders_on_automated_mode(product_type: str, tlp: str) -> list:
     """Stakeholders who take `product_type` unattended and are cleared for its TLP.
 

@@ -252,7 +252,7 @@ class BriefingRejectionRoutes(unittest.TestCase):
                  mock.patch.object(misp_store, "get_briefing",
                                    return_value=misp_store._briefing_ns(_event(state))), \
                  mock.patch.object(misp_store, "list_product_feedback", return_value=[]), \
-                 mock.patch.object(misp_store, "stakeholders_cleared_for", return_value=[]), \
+                 mock.patch.object(misp_store, "list_stakeholders", return_value=[]), \
                  mock.patch.object(audit, "latest_notify_status", return_value=None):
                 page = BeautifulSoup(self.client.get(f"/briefing/{UUID}").data, "html.parser")
                 form = page.select_one(f'form[action="/briefing/{UUID}/reject"]')
@@ -266,7 +266,7 @@ class BriefingRejectionRoutes(unittest.TestCase):
         with mock.patch.object(misp_store, "get_briefing",
                                return_value=misp_store._briefing_ns(_event("rejected", reason))), \
              mock.patch.object(misp_store, "list_product_feedback", return_value=[]), \
-             mock.patch.object(misp_store, "stakeholders_cleared_for", return_value=[]), \
+             mock.patch.object(misp_store, "list_stakeholders", return_value=[]), \
              mock.patch.object(audit, "latest_notify_status", return_value=None):
             page = BeautifulSoup(self.client.get(f"/briefing/{UUID}", headers=self.headers).data,
                                  "html.parser")

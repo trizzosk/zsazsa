@@ -113,7 +113,11 @@
       <tbody>
         {% for gir in girs %}
         <tr class="req-row" data-req-id="{{ gir.id }}">
-          <td><span class="req-id-badge">{{ gir.gir_id }}</span></td>
+          <td>
+            <a href="{{ url_for('requirements.gir_detail', id=gir.id) }}" class="text-decoration-none">
+              <span class="req-id-badge">{{ gir.gir_id }}</span>
+            </a>
+          </td>
           <td>
             <a href="{{ url_for('requirements.gir_detail', id=gir.id) }}" class="fw-semibold text-decoration-none">{{ gir.topic }}</a>
             {% if gir.description %}

@@ -109,6 +109,11 @@ class BriefingRecipients(unittest.TestCase):
     def test_clearance_does_not_subscribe_anyone(self):
         self.assertNotIn("Outsider", self.cleared(self.people, "clear"))
 
+    def test_the_subscribers_left_out_are_the_blocked_ones(self):
+        with mock.patch.object(misp_store, "list_stakeholders", return_value=self.people):
+            blocked = misp_store.stakeholders_blocked_by_tlp("Daily threat briefing", "green")
+        self.assertEqual([s.name for s in blocked], ["Comms"])
+
 
 class Clearance(unittest.TestCase):
     """TLP ranks run least to most restrictive, and clearance covers everything at

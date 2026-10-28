@@ -184,6 +184,40 @@ class BriefingComposeForm(unittest.TestCase):
             self.page.locator(".btn-draft-summary").evaluate_all("els => els.map(e => e.disabled)"),
             [True, True])
 
+    # ── the overlap check ────────────────────────────────────────────────────
+
+    def check_overlap(self, a, b):
+        """Runs the check with the worker's answer that stories a and b cover
+        the same event. The check refuses stories without text."""
+        self.page.evaluate("() => document.querySelectorAll('.story-content').forEach(t => t.value = 'Text')")
+        self.page.route("**/api/briefing-overlap-check",
+                        lambda route: route.fulfill(json={"ok": True, "job_id": "overlap"}))
+        self.page.route("**/pipeline/run/overlap", lambda route: route.fulfill(json={
+            "ok": True, "job": {"status": "completed",
+                                "result": {"overlaps": [{"a": a, "b": b, "score": 0.8, "reason": "Same event."}]}}}))
+        self.page.locator("#btn-check-overlap").dispatch_event("click")
+        self.page.locator("#overlap-results li").wait_for()
+
+    def overlap_pairs(self):
+        return self.page.locator("#overlap-results .fw-semibold").all_inner_texts()
+
+    def test_deleting_a_story_keeps_the_overlap_overview_until_it_is_acknowledged(self):
+        self.check_overlap(1, 2)
+        self.open_pane("story-1")
+        self.remove_open_story()
+        self.assertEqual(self.overlap_pairs(), ["A deleted story and Story 1"])
+        self.assertEqual(self.page.locator(".story-card.border-warning").count(), 0)
+        self.page.locator("#btn-overlap-acknowledge").click()
+        self.assertFalse(self.page.locator("#overlap-results").is_visible())
+
+    def test_an_overlapping_pair_follows_its_stories_when_another_is_deleted(self):
+        self.page.locator("#btn-add-story").click()
+        self.check_overlap(2, 3)
+        self.open_pane("story-1")
+        self.remove_open_story()
+        self.assertEqual(self.overlap_pairs(), ["Story 1 and Story 2"])
+        self.assertEqual(self.page.locator(".story-card.border-warning").count(), 2)
+
     # ── keyboard and assistive technology ────────────────────────────────────
 
     def test_the_rail_is_wired_up_as_a_tablist(self):

@@ -125,6 +125,15 @@ class Lists(_Page):
         self.assertEqual(weekly.select_one('select[name="review_cycle"] option[selected]')["value"], "Weekly")
         self.assertIn("Review cycle Weekly 1 Quarterly 1", self.stats(weekly))
 
+    def test_the_id_opens_the_requirement_like_its_title(self):
+        with mock.patch.object(misp_store, "list_pirs", return_value=[_pir(1, status="Active")]), \
+             mock.patch.object(misp_store, "list_girs", return_value=[_gir(1, status="Active")]):
+            pages = {"PIR": self.page("/pirs"), "GIR": self.page("/girs")}
+        for name, page in pages.items():
+            with self.subTest(name):
+                badge, title = page.select("tbody tr.req-row td")[:2]
+                self.assertEqual(badge.a["href"], title.a["href"])
+
     def pirs(self, path):
         pirs = [_pir(1, status="Active"), _pir(2, status="Pending", intake_status="rejected"),
                 _pir(3, status="Pending", intake_status="rejected")]

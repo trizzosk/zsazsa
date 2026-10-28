@@ -381,6 +381,7 @@ def recipients_fragment(id):
         "daily_briefing/_recipients.html",
         briefing=briefing,
         recipients=misp_store.stakeholders_cleared_for("Daily threat briefing", briefing.tlp),
+        blocked=misp_store.stakeholders_blocked_by_tlp("Daily threat briefing", briefing.tlp),
     )
 
 
@@ -538,6 +539,7 @@ def detail(id):
         ai_job=job_store.by_entity("briefing-draft").get(briefing.uuid),
         feedback=feedback,
         recipients=recipients,
+        blocked=misp_store.stakeholders_blocked_by_tlp("Daily threat briefing", briefing.tlp),
         notify_status=notify_status,
         source_meta=source_meta,
         scope_summary=misp_store.briefing_combined_scope_summary(briefing),
