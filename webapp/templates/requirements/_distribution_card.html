@@ -1,5 +1,6 @@
 {# Read-only distribution card shared by the PIR and GIR detail pages.
-   Expects in context: distribution, selected_count, dist_edit_url. #}
+   Expects in context: distribution, selected_count, dist_edit_url, dist_owner_uuid.
+   The owner is marked whether or not it is a recipient. #}
 <div class="card content-card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center">
     <span><i class="fas fa-share-nodes me-2"></i>Distribution</span>
@@ -48,6 +49,11 @@
               <a href="{{ url_for('stakeholders.detail', id=s.uuid) }}">{{ s.name }}</a>
               {% else %}
               {{ s.name }}
+              {% endif %}
+              {% if s.uuid and s.uuid == dist_owner_uuid %}
+              <span class="badge text-bg-primary ms-1 dist-owner-badge" title="Owner of this requirement">
+                <i class="fas fa-user-tie fa-xs me-1"></i>Owner
+              </span>
               {% endif %}
             </div>
             {% if s.role or s.organization %}

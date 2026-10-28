@@ -16,11 +16,12 @@ from types import SimpleNamespace
 from unittest import mock
 
 from bs4 import BeautifulSoup
+from flask import render_template
 from pymisp import MISPEvent, PyMISP
 
 import config
 from webapp import collection_cache, create_app, misp_store, org_store, sso_users
-from webapp.routes import export
+from webapp.routes import export, requirements
 
 UUID = "5f0c7a3e-1b2c-4d5e-8f90-a1b2c3d4e5f6"
 ORG_UUID = "0b3f6a8e-2c4d-4e5f-9a1b-c2d3e4f5a6b7"
@@ -410,6 +411,19 @@ class Pages(TempDatabase):
                          ["Bob", "Cy"])
         self.assertNotIn("text-danger", rows["Ada"][pir].span["class"])
         self.assertEqual(rows["Bob"][gir].span["title"], "0 owned; 0 in distribution")
+
+    def test_the_distribution_of_a_requirement_marks_its_owner(self):
+        """Whether or not the owner is also a recipient."""
+        stakeholders = [_stakeholder(), _stakeholder(uuid="b" * 36, id="b" * 36, name="Bob")]
+        for recipients, ribbon in (([UUID], "Recipient"), (["b" * 36], "Not selected")):
+            with self.subTest(ribbon), self.client.application.test_request_context():
+                distribution = requirements._distribution_entries(recipients, stakeholders)
+                page = BeautifulSoup(render_template(
+                    "requirements/_distribution_card.html", distribution=distribution, selected_count=1,
+                    dist_edit_url="", dist_owner_uuid=UUID), "html.parser")
+            owners = [badge.find_parent(class_="dist-card") for badge in page.select(".dist-owner-badge")]
+            self.assertEqual([card.select_one(".dist-card-name a").get_text() for card in owners], ["Ada"])
+            self.assertEqual(owners[0].select_one(".dist-status-ribbon").get_text(strip=True), ribbon)
 
     def test_the_page_of_an_owner_disables_delete(self):
         empty = {name: mock.Mock(return_value=[]) for name in (

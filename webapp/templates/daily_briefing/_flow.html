@@ -1,0 +1,106 @@
+{# How a daily briefing is made, collapsed under the filters of the briefing list.
+   Expects briefing_hour, the hour (UTC) of the scheduled briefing, or None
+   while the schedule is off. The settings links are for site admins, the only
+   users the settings pages let in. #}
+{% from "_flow_macros.html" import flow_card, funnel, step_head, collection_step, channels %}
+{% call flow_card("From everything collected to one briefing in the stakeholders' inbox") %}
+<div class="flow-modes">
+  <span class="flow-mode flow-auto">
+    <i class="fas fa-robot"></i>
+    <span>
+      {% if briefing_hour is not none %}
+      The analyser makes a draft every day from {{ '%02d' | format(briefing_hour) }}:00 UTC, and when you start it from the dashboard.
+      {% else %}
+      The analyser makes a draft when you start it from the dashboard. Its daily schedule is off{% if is_site_admin %}
+      (<a href="{{ url_for('config_page.index', tab='tab-system') }}">Settings &gt; System</a>){% endif %}.
+      {% endif %}
+    </span>
+  </span>
+  <span class="flow-mode flow-hand">
+    <i class="fas fa-user"></i>
+    <span>Or make one by hand with <a href="{{ url_for('data_collection.index', briefing_mode=1) }}" class="fw-semibold">New briefing</a>.</span>
+  </span>
+</div>
+
+<div class="flow">
+  {{ funnel(["Everything collected", "Today's open events", "What is relevant", "One draft", "Approved", "Delivered"]) }}
+  {{ collection_step() }}
+
+  <div class="flow-step flow-next-auto flow-is-auto" style="--step-color:var(--accent-blue);">
+    {{ step_head(2, 'fa-tags', 'Triage and enrichment', 75, "Today's open events") }}
+    <div class="flow-row"><i class="fas fa-rss"></i><span>The scraper tags the feed, the source and its reliability (Admiralty scale).</span></div>
+    <div class="flow-row"><i class="fas fa-traffic-light"></i><span>TLP, and the workflow state <em>incomplete</em>.</span></div>
+    <div class="flow-row"><i class="fas fa-wand-magic-sparkles"></i><span>An AI summary tags the sectors, countries, actors and ATT&amp;CK techniques.</span></div>
+    <div class="flow-who flow-auto">
+      <span class="flow-who-title"><i class="fas fa-robot me-1"></i>Selecting the events</span>
+      <div class="flow-row"><i class="fas fa-calendar-day"></i><span>Today's events still open, and yesterday's on the scheduled run</span></div>
+      <div class="flow-row"><i class="fas fa-link-slash"></i><span>Article not fetched or empty <span class="flow-out flow-out-drop"><i class="fas fa-xmark"></i>rejected</span></span></div>
+      <div class="flow-row"><i class="fas fa-filter"></i><span>Excluded title <span class="flow-out flow-out-skip">left out</span></span></div>
+      <div class="flow-row"><i class="fas fa-clone"></i><span>Already in a briefing <span class="flow-out flow-out-skip">left out</span></span></div>
+    </div>
+    {% if is_site_admin %}
+    <div class="flow-links">
+      <a href="{{ url_for('config_page.index', tab='tab-products') }}" class="btn btn-xs btn-outline-secondary"><i class="fas fa-filter me-1"></i>Title exclusions</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="flow-step flow-next-auto flow-is-auto" style="--step-color:var(--accent-green);">
+    {{ step_head(3, 'fa-bullseye', 'Align with needs', 50, 'What is relevant') }}
+    <div class="flow-row"><i class="fas fa-star"></i><span>Matches the scope of an active PIR or GIR <span class="flow-out flow-out-keep"><i class="fas fa-check"></i>always in</span></span></div>
+    <div class="flow-who flow-auto">
+      <span class="flow-who-title"><i class="fas fa-robot me-1"></i>Every other event</span>
+      <div class="flow-row"><i class="fas fa-shield-halved"></i><span>The AI asks: is it useful threat intelligence? An incident, a campaign, an exploited CVE or attacker techniques, not marketing or company news.</span></div>
+      <div class="flow-row"><i class="fas fa-circle-check"></i><span>Useful <span class="flow-out flow-out-keep"><i class="fas fa-check"></i>kept</span></span></div>
+      <div class="flow-row"><i class="fas fa-circle-xmark"></i><span>Not useful <span class="flow-out flow-out-drop"><i class="fas fa-xmark"></i>rejected</span> with the reason in a report on the event</span></div>
+    </div>
+    <div class="flow-links">
+      <a href="{{ url_for('requirements.pir_list') }}" class="btn btn-xs btn-outline-secondary"><i class="fas fa-star me-1"></i>PIRs</a>
+      <a href="{{ url_for('requirements.gir_list') }}" class="btn btn-xs btn-outline-secondary"><i class="fas fa-list-check me-1"></i>GIRs</a>
+    </div>
+  </div>
+
+  <div class="flow-step flow-is-auto" style="--step-color:var(--accent-orange);">
+    {{ step_head(4, 'fa-pen-nib', 'Generate the draft', 25, 'One draft') }}
+    <div class="flow-who flow-auto">
+      <span class="flow-who-title"><i class="fas fa-robot me-1"></i>Analyser</span>
+      <div class="flow-row"><i class="fas fa-newspaper"></i><span>A story per event, written with your focus points in mind</span></div>
+      <div class="flow-row"><i class="fas fa-object-group"></i><span>Stories about the same news removed</span></div>
+      <div class="flow-row"><i class="fas fa-align-left"></i><span>A summary of the day</span></div>
+    </div>
+    <div class="flow-who flow-hand">
+      <span class="flow-who-title"><i class="fas fa-user me-1"></i>By hand</span>
+      <div class="flow-row"><i class="fas fa-hand-pointer"></i><span>Pick events from any source on Data collection, and write the stories with AI help.</span></div>
+    </div>
+    <div class="flow-row"><i class="fas fa-file-lines"></i><span>One briefing in <span class="flow-state" style="--state-color:var(--neutral-500);">draft</span>. Its events are tagged, so they stay out of the next one.</span></div>
+  </div>
+
+  <div class="flow-step" style="--step-color:var(--neutral-700);">
+    {{ step_head(5, 'fa-clipboard-check', 'Review and approval', 25, 'Approved') }}
+    <div class="flow-states">
+      <span class="flow-state" style="--state-color:var(--neutral-500);">draft</span><i class="fas fa-arrow-right"></i>
+      <span class="flow-state" style="--state-color:var(--accent-green);">published</span>
+      <span class="flow-state" style="--state-color:var(--accent-red);">rejected</span>
+    </div>
+    <div class="flow-row"><i class="fas fa-pen"></i><span>Edit the stories and the summary.</span></div>
+    {# Look-alikes of the list's buttons, not buttons. #}
+    <div class="flow-buttons" aria-hidden="true">
+      <span class="btn btn-xs btn-success"><i class="fas fa-check me-1"></i>Approve &amp; publish</span>
+      <span class="btn btn-xs btn-outline-danger"><i class="fas fa-xmark me-1"></i>Reject</span>
+    </div>
+  </div>
+
+  <div class="flow-step" style="--step-color:var(--accent-red);">
+    {{ step_head(6, 'fa-paper-plane', 'Publish', 25, 'Delivered') }}
+    <div class="flow-row"><img src="{{ url_for('static', filename='misp-logo.png') }}" alt=""><span>The MISP event is published.</span></div>
+    <div class="flow-row"><i class="fas fa-users"></i><span>Sent to the stakeholders subscribed to the daily briefing, if their TLP clearance allows it.</span></div>
+    {{ channels(flowintel=False) }}
+    <div class="flow-row"><i class="fas fa-user-check"></i><span><strong>Recipients</strong> shows who gets it before you publish.</span></div>
+    <div class="flow-row"><i class="fas fa-comments"></i><span>The stakeholders' feedback is recorded on the briefing.</span></div>
+    <div class="flow-row"><i class="fas fa-rotate-right"></i><span><strong>Resend</strong> delivers it again.</span></div>
+    <div class="flow-links">
+      <a href="{{ url_for('stakeholders.list') }}" class="btn btn-xs btn-outline-secondary"><i class="fas fa-users me-1"></i>Stakeholders</a>
+    </div>
+  </div>
+</div>
+{% endcall %}

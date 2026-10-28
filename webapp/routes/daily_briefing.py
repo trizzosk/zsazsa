@@ -365,6 +365,8 @@ def list_briefings():
                                     misp_store.BRIEFING_REVIEW_STATES),
         tlp_counts=tlp_counts(matching(all_briefings, tests, skip="tlp")),
         can_publish=misp_session.current_user_can_publish(),
+        briefing_hour=(getattr(config, "ANALYSER_DAILY_BRIEFING_HOUR", 21)
+                       if getattr(config, "ANALYSER_DAILY_BRIEFING", False) else None),
         sort=sort,
         dir=direction,
     )

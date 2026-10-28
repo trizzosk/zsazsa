@@ -1,0 +1,105 @@
+{# How a vulnerability advisory is made, collapsed under the filters of the
+   advisory list. Expects schedule_advisories, whether the scheduled analyser
+   makes advisories, and assets_enabled, whether the asset inventory is on. The
+   settings links are for site admins, the only users the settings pages let in. #}
+{% from "_flow_macros.html" import flow_card, funnel, step_head, collection_step, channels %}
+{% call flow_card("From everything collected to an advisory in the stakeholders' inbox") %}
+<div class="flow-modes">
+  <span class="flow-mode flow-auto">
+    <i class="fas fa-robot"></i>
+    <span>
+      {% if schedule_advisories %}
+      On every scheduled run, the analyser looks for CVEs in the new events, and when you start it from the dashboard.
+      {% else %}
+      The analyser looks for CVEs when you start it from the dashboard. The scheduled advisories are off{% if is_site_admin %}
+      (<a href="{{ url_for('config_page.index', tab='tab-system') }}">Settings &gt; System</a>){% endif %}.
+      {% endif %}
+    </span>
+  </span>
+  <span class="flow-mode flow-hand">
+    <i class="fas fa-user"></i>
+    <span>Or make one by hand with <a href="{{ url_for('vea.wizard_new') }}" class="fw-semibold">New advisory</a>, or from an event on Data collection.</span>
+  </span>
+</div>
+
+<div class="flow">
+  {{ funnel(["Everything collected", "New events", "CVEs that concern you", "One draft per event", "Approved", "Delivered"]) }}
+  {{ collection_step() }}
+
+  <div class="flow-step flow-next-auto flow-is-auto" style="--step-color:var(--accent-blue);">
+    {{ step_head(2, 'fa-tags', 'Triage and enrichment', 75, 'New events') }}
+    <div class="flow-row"><i class="fas fa-rss"></i><span>The scraper tags the feed, the source and its reliability (Admiralty scale).</span></div>
+    <div class="flow-row"><i class="fas fa-traffic-light"></i><span>TLP, and the workflow state <em>incomplete</em>.</span></div>
+    <div class="flow-row"><i class="fas fa-wand-magic-sparkles"></i><span>An AI summary tags the sectors, countries, actors and ATT&amp;CK techniques.</span></div>
+    <div class="flow-who flow-auto">
+      <span class="flow-who-title"><i class="fas fa-robot me-1"></i>Selecting the events</span>
+      <div class="flow-row"><i class="fas fa-calendar-day"></i><span>Open events that came in or changed since the previous run, and today's when started from the dashboard</span></div>
+      <div class="flow-row"><i class="fas fa-link-slash"></i><span>Article not fetched or empty <span class="flow-out flow-out-drop"><i class="fas fa-xmark"></i>rejected</span></span></div>
+      <div class="flow-row"><i class="fas fa-clone"></i><span>Already has an advisory <span class="flow-out flow-out-skip">left out</span></span></div>
+    </div>
+  </div>
+
+  <div class="flow-step flow-next-auto flow-is-auto" style="--step-color:var(--accent-green);">
+    {{ step_head(3, 'fa-bullseye', 'Align with needs', 50, 'CVEs that concern you') }}
+    <div class="flow-who flow-auto">
+      <span class="flow-who-title"><i class="fas fa-robot me-1"></i>Looking for CVEs</span>
+      <div class="flow-row"><i class="fas fa-bug"></i><span>A CVE in the event's vulnerability attributes, or in its title <span class="flow-out flow-out-keep"><i class="fas fa-check"></i>advisory</span></span></div>
+      <div class="flow-row"><i class="fas fa-circle-xmark"></i><span>No CVE <span class="flow-out flow-out-skip">left out</span></span></div>
+      <div class="flow-row"><i class="fas fa-clone"></i><span>Every CVE already in a draft or an advisory in review <span class="flow-out flow-out-skip">left out</span></span></div>
+    </div>
+    <div class="flow-row"><i class="fas fa-server"></i><span>
+      Asset inventory
+      {% if assets_enabled %}<span class="flow-out flow-out-keep">on</span>: only a CVE in a product you run makes an advisory.
+      {% else %}<span class="flow-out flow-out-skip">off</span>: every CVE makes an advisory.{% endif %}
+    </span></div>
+    {% if is_site_admin %}
+    <div class="flow-links">
+      <a href="{{ url_for('config_page.index', tab='tab-products') }}" class="btn btn-xs btn-outline-secondary"><i class="fas fa-server me-1"></i>Asset inventory</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="flow-step flow-is-auto" style="--step-color:var(--accent-orange);">
+    {{ step_head(4, 'fa-pen-nib', 'Generate the draft', 25, 'One draft per event') }}
+    <div class="flow-who flow-auto">
+      <span class="flow-who-title"><i class="fas fa-robot me-1"></i>Analyser</span>
+      <div class="flow-row"><i class="fas fa-magnifying-glass"></i><span>The CVE is looked up in <strong>Vulnerability lookup</strong>: CVSS, CWE, and the affected products and versions.</span></div>
+      <div class="flow-row"><i class="fas fa-wand-magic-sparkles"></i><span>The AI drafts the advisory{% if assets_enabled %}, with the assets of yours that are exposed{% endif %}.</span></div>
+      <div class="flow-row"><i class="fas fa-circle-info"></i><span>Under its title, the entry says why it was included: the CVEs it names.</span></div>
+      <div class="flow-row"><i class="fas fa-tag"></i><span>The source event is tagged and moves to <em>ongoing</em>.</span></div>
+    </div>
+    <div class="flow-row"><i class="fas fa-file-lines"></i><span>One advisory per event, in <span class="flow-state" style="--state-color:var(--neutral-500);">draft</span>.</span></div>
+  </div>
+
+  <div class="flow-step" style="--step-color:var(--neutral-700);">
+    {{ step_head(5, 'fa-clipboard-check', 'Review and approval', 25, 'Approved') }}
+    <div class="flow-states">
+      <span class="flow-state" style="--state-color:var(--neutral-500);">draft</span><i class="fas fa-arrow-right"></i>
+      <span class="flow-state" style="--state-color:var(--accent-blue);">pending review</span><i class="fas fa-arrow-right"></i>
+      <span class="flow-state" style="--state-color:var(--accent-green);">approved</span>
+      <span class="flow-state" style="--state-color:var(--accent-red);">rejected</span>
+    </div>
+    <div class="flow-row"><i class="fas fa-paper-plane"></i><span><strong>Submit for review</strong> asks for approval.</span></div>
+    {# Look-alikes of the list's buttons, not buttons. #}
+    <div class="flow-buttons" aria-hidden="true">
+      <span class="btn btn-xs btn-outline-info"><i class="fas fa-clipboard-check me-1"></i>QA check against source</span>
+      <span class="btn btn-xs btn-success"><i class="fas fa-check me-1"></i>Approve &amp; publish</span>
+      <span class="btn btn-xs btn-outline-danger"><i class="fas fa-xmark me-1"></i>Reject</span>
+    </div>
+    <div class="flow-row"><i class="fas fa-user-group"></i><span>An advisory needs an audience before it is approved.</span></div>
+  </div>
+
+  <div class="flow-step" style="--step-color:var(--accent-red);">
+    {{ step_head(6, 'fa-paper-plane', 'Publish', 25, 'Delivered') }}
+    <div class="flow-row"><img src="{{ url_for('static', filename='misp-logo.png') }}" alt=""><span>The MISP event is published.</span></div>
+    <div class="flow-row"><i class="fas fa-users"></i><span>Sent to the stakeholders subscribed to vulnerability advisories, cleared for its TLP and with a role in its audience.</span></div>
+    {{ channels() }}
+    <div class="flow-row"><i class="fas fa-user-check"></i><span><strong>Recipients</strong> shows who gets it before you publish.</span></div>
+    <div class="flow-row"><i class="fas fa-comments"></i><span>The stakeholders' feedback is recorded on the advisory. The dashboard lists the advisories still waiting for it, with their deadline.</span></div>
+    <div class="flow-row"><i class="fas fa-rotate-right"></i><span><strong>Resend</strong> delivers it again.</span></div>
+    <div class="flow-links">
+      <a href="{{ url_for('stakeholders.list') }}" class="btn btn-xs btn-outline-secondary"><i class="fas fa-users me-1"></i>Stakeholders</a>
+    </div>
+  </div>
+</div>
+{% endcall %}

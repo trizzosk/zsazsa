@@ -202,6 +202,8 @@ def review():
         tlp_counts=tlp_counts(matching(all_fias, tests, skip="tlp")),
         audience_counts=misp_store.audience_counts(matching(all_fias, tests, skip="audience")),
         can_publish=misp_session.current_user_can_publish(),
+        schedule_focus=getattr(_cfg, "ANALYSER_FLASH_INTEL", True),
+        schedule_requirements=getattr(_cfg, "ANALYSER_FLASH_INTEL_REQUIREMENTS", False),
         sort=sort,
         dir=direction,
     )

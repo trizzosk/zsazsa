@@ -280,6 +280,7 @@
 
     <!-- Distribution (read-only view) -->
     {% set dist_edit_url = url_for('requirements.pir_edit', id=pir.uuid) %}
+    {% set dist_owner_uuid = pir.owner_uuid %}
     {% include "requirements/_distribution_card.html" %}
 
     {% if pir.resolution_note %}
@@ -416,7 +417,7 @@
     <div class="card content-card mb-4">
       <div class="card-header"><i class="fas fa-satellite-dish me-2"></i>Collection coverage</div>
       <div class="card-body small">
-        {% if not pir.focus_points %}
+        {% if not scope_terms %}
         <p class="text-muted mb-0">No scope items. Add scope items to see collection coverage.</p>
         {% elif coverage and coverage.recent_matches > 0 %}
         <p class="mb-1">

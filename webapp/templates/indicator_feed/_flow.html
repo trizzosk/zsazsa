@@ -1,0 +1,99 @@
+{# How an indicator feed is made, collapsed under the filters of the feed list.
+   Four steps rather than six: an analyst builds the feed, and it is served
+   rather than published. The settings link is for site admins, the only users
+   the settings pages let in. #}
+{% from "_flow_macros.html" import flow_card, funnel, step_head, channels %}
+{% set misp_logo = url_for('static', filename='misp-logo.png') %}
+{% call flow_card("From the MISP communities to the stakeholders' tools") %}
+<div class="flow-modes">
+  <span class="flow-mode flow-hand">
+    <i class="fas fa-user"></i>
+    <span>An analyst builds each feed with <a href="{{ url_for('indicator_feed.new') }}" class="fw-semibold">New feed</a>.</span>
+  </span>
+  <span class="flow-mode flow-auto">
+    <i class="fas fa-robot"></i>
+    <span>Every analyser run refreshes the cached feeds that are due.</span>
+  </span>
+</div>
+
+<div class="flow flow-4">
+  {{ funnel(["Everything in MISP", "Your selection", "Served and cached", "In the stakeholders' tools"],
+            colours=['--accent-cyan', '--accent-blue', '--accent-orange', '--accent-red'], narrow_at=480) }}
+
+  <div class="flow-step" style="--step-color:var(--accent-cyan);">
+    {{ step_head(1, 'fa-share-nodes', 'MISP communities', 100, 'Everything in MISP') }}
+    <div class="flow-sources">
+      <div class="flow-source">
+        <img src="{{ misp_logo }}" alt="">
+        <strong>zsazsa's MISP</strong>
+        <span>Asked first, unless a feed leaves it out</span>
+      </div>
+      <div class="flow-source">
+        <img src="{{ misp_logo }}" alt="">
+        <strong>Other MISP servers</strong>
+        <span>Your collection sources</span>
+      </div>
+    </div>
+    <div class="flow-row"><i class="fas fa-layer-group"></i><span>A feed can ask several servers. A value found on more than one is reported by the first.</span></div>
+    <div class="flow-row"><i class="fas fa-shield-halved"></i><span>zsazsa's own records, such as stakeholders, requirements and products, are never in a feed.</span></div>
+    {% if is_site_admin %}
+    <div class="flow-links">
+      <a href="{{ url_for('collection_sources.index') }}" class="btn btn-xs btn-outline-secondary"><i class="fas fa-server me-1"></i>Collection sources</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="flow-step" style="--step-color:var(--accent-blue);">
+    {{ step_head(2, 'fa-sliders', 'Triage: build the feed', 50, 'Your selection') }}
+    <div class="flow-who flow-hand">
+      <span class="flow-who-title"><i class="fas fa-user me-1"></i>Query builder</span>
+      <div class="flow-row"><i class="fas fa-fingerprint"></i><span>Attribute types, the IDS flag, published events only, and values on a warninglist left out</span></div>
+      <div class="flow-row"><i class="fas fa-tags"></i><span>Tags and organisations to include or leave out</span></div>
+      <div class="flow-row"><i class="fas fa-cube"></i><span>Events to include or leave out, with <strong>+</strong> and <strong>-</strong> on the results</span></div>
+      <div class="flow-row"><i class="fas fa-calendar-days"></i><span>A window on the attribute and the event dates, and a limit</span></div>
+    </div>
+    <div class="flow-row"><i class="fas fa-play"></i><span><strong>Run search</strong> shows the indicators. Nothing is saved until <strong>Save changes</strong>.</span></div>
+    <div class="flow-row"><i class="fas fa-code"></i><span>The PyMISP query is shown as it runs, ready to copy.</span></div>
+    <div class="flow-row"><i class="fas fa-file-signature"></i><span>Saved as a product, with a TLP, an audience, a linked PIR and a caching schedule.</span></div>
+    <div class="flow-links">
+      <a href="{{ url_for('indicator_feed.new') }}" class="btn btn-xs btn-outline-secondary"><i class="fas fa-plus me-1"></i>New feed</a>
+    </div>
+  </div>
+
+  <div class="flow-step flow-next-auto" style="--step-color:var(--accent-orange);">
+    {{ step_head(3, 'fa-link', 'Public URL and caching', 25, 'Served and cached') }}
+    <div class="flow-row"><i class="fas fa-link"></i><span>Each feed has its own URL with a random token. A tool pulls it without a login.</span></div>
+    <div class="flow-formats">
+      <span class="flow-format" title="One unique value per line">TXT</span>
+      <span class="flow-format" title="One row per attribute, with its event and server">CSV</span>
+      <span class="flow-format">TSV</span>
+      <span class="flow-format">JSON</span>
+    </div>
+    <div class="flow-row"><i class="fas fa-toggle-on"></i><span>Switching the URL on or off takes the MISP publish permission. While off, it answers as if it did not exist.</span></div>
+    <div class="flow-row"><i class="fas fa-key"></i><span><strong>New token</strong> gives the feed a new URL when a link has reached the wrong people.</span></div>
+    <div class="flow-who flow-auto">
+      <span class="flow-who-title"><i class="fas fa-robot me-1"></i>Caching</span>
+      <div class="flow-row"><i class="fas fa-clock"></i><span>Hourly, daily or weekly, on the clock of the moment the feed was saved</span></div>
+      <div class="flow-row"><i class="fas fa-file"></i><span>A pull reads the cached file instead of asking MISP. Without caching, every pull runs the query.</span></div>
+      <div class="flow-row"><i class="fas fa-triangle-exclamation"></i><span>A failed refresh keeps serving the last copy rather than an empty feed.</span></div>
+    </div>
+  </div>
+
+  <div class="flow-step" style="--step-color:var(--accent-red);">
+    {{ step_head(4, 'fa-users', 'Used by stakeholders', 25, "In the stakeholders' tools") }}
+    <div class="flow-row"><i class="fas fa-plug"></i><span>Their tools, such as a SIEM, a firewall or an EDR, pull the public URL.</span></div>
+    <div class="flow-who flow-hand">
+      <span class="flow-who-title"><i class="fas fa-user me-1"></i>Notify</span>
+      <div class="flow-row"><i class="fas fa-paper-plane"></i><span>Sends the indicators to the stakeholders subscribed to indicator feeds, cleared for its TLP and with a role in its audience.</span></div>
+      {{ channels(flowintel=False) }}
+      <div class="flow-row"><i class="fas fa-paperclip"></i><span>The e-mail has the CSV attached.</span></div>
+      <div class="flow-row"><i class="fas fa-key"></i><span>Notifying takes the MISP publish permission. <strong>Recipients</strong> shows who gets it before you notify.</span></div>
+    </div>
+    <div class="flow-row"><i class="fas fa-user-secret"></i><span>A threat actor profile can embed the feed to list the actor's infrastructure.</span></div>
+    <div class="flow-row"><i class="fas fa-circle-info"></i><span>A feed is delivered, not published in MISP.</span></div>
+    <div class="flow-links">
+      <a href="{{ url_for('stakeholders.list') }}" class="btn btn-xs btn-outline-secondary"><i class="fas fa-users me-1"></i>Stakeholders</a>
+    </div>
+  </div>
+</div>
+{% endcall %}

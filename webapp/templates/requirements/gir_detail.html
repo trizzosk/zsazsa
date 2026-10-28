@@ -253,6 +253,7 @@
 
     <!-- Distribution (read-only view) -->
     {% set dist_edit_url = url_for('requirements.gir_edit', id=gir.uuid) %}
+    {% set dist_owner_uuid = gir.owner_uuid %}
     {% include "requirements/_distribution_card.html" %}
 
   </div>

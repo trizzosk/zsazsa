@@ -1,0 +1,107 @@
+{# The parts of "How a ... is made" that the product lists share: the line in
+   the filter box that opens it, the panel, the funnel over the steps, a step's
+   head, the delivery channels, and step 1, Collection, for the products made
+   from collected events. The other steps differ per product and live in that
+   product's _flow.html. Static: nothing here reads MISP. #}
+
+{% macro flow_help(title) %}
+<button type="button" class="flow-help" data-bs-toggle="collapse" data-bs-target="#product-flow"
+        aria-expanded="false" aria-controls="product-flow">
+  <i class="fas fa-circle-question"></i>{{ title }}
+</button>
+{% endmacro %}
+
+{# The panel flow_help opens, under the filter box. #}
+{% macro flow_card(hint) %}
+<div class="collapse" id="product-flow">
+  <div class="card content-card mb-3">
+    <div class="flow-panel-head">
+      <span class="flow-panel-icon"><i class="fas fa-filter"></i></span>
+      {{ hint }}
+      <button type="button" class="btn-close ms-auto" data-bs-toggle="collapse" data-bs-target="#product-flow"
+              aria-controls="product-flow" aria-label="Close"></button>
+    </div>
+    <div class="card-body pt-1">
+      {{ caller() }}
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+{# One label and one colour per step. The funnel is wide where everything comes
+   in and narrows until `narrow_at` (of 1000), then runs on as a pipe. #}
+{% macro funnel(labels,
+                colours=['--accent-cyan', '--accent-blue', '--accent-green', '--accent-orange', '--neutral-700', '--accent-red'],
+                narrow_at=640) %}
+<div class="flow-funnel" aria-hidden="true">
+  <svg viewBox="0 0 1000 74" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="flow-funnel-fill" x1="0" x2="1" y1="0" y2="0">
+        {% for colour in colours %}
+        <stop offset="{{ loop.index0 / (loop.length - 1) }}" style="stop-color:var({{ colour }})"/>
+        {% endfor %}
+      </linearGradient>
+    </defs>
+    <path d="M0,2 C{{ narrow_at * 0.31 }},2 {{ narrow_at * 0.66 }},18 {{ narrow_at }},26 L1000,26 L1000,48 L{{ narrow_at }},48 C{{ narrow_at * 0.66 }},56 {{ narrow_at * 0.31 }},72 0,72 Z"
+          fill="url(#flow-funnel-fill)" opacity=".9"/>
+  </svg>
+  <div class="flow-funnel-labels">
+    {% for label in labels %}<span>{{ label }}</span>{% endfor %}
+  </div>
+</div>
+{% endmacro %}
+
+{# The head of a step and, where the funnel is not shown, its bar. #}
+{% macro step_head(number, icon, title, meter_width, meter_label) %}
+<div class="flow-head">
+  <span class="flow-icon"><i class="fas {{ icon }}"></i></span>
+  <div><small>Step {{ number }}</small><strong>{{ title }}</strong></div>
+</div>
+<div class="flow-meter"><div class="flow-meter-track"><span style="width:{{ meter_width }}%"></span></div>{{ meter_label }}</div>
+{% endmacro %}
+
+{% macro collection_step() %}
+{% set misp_logo = url_for('static', filename='misp-logo.png') %}
+<div class="flow-step flow-next-auto" style="--step-color:var(--accent-cyan);">
+  {{ step_head(1, 'fa-satellite-dish', 'Collection', 100, 'Everything collected') }}
+  <div class="flow-sources">
+    <div class="flow-source">
+      <span class="flow-read" title="Read by the analyser"><i class="fas fa-robot"></i></span>
+      <img src="{{ misp_logo }}" alt="">
+      <strong>MISP scraper</strong>
+      <span>Articles from feeds and websites</span>
+    </div>
+    <div class="flow-source">
+      <span class="flow-read" title="Read by the analyser"><i class="fas fa-robot"></i></span>
+      <i class="fas fa-envelope-open-text"></i>
+      <strong>Newsletters</strong>
+      <span>Pasted or by e-mail; links go to the scraper</span>
+    </div>
+    <div class="flow-source">
+      <img src="{{ misp_logo }}" alt="">
+      <strong>MISP communities</strong>
+      <span>Other MISP servers</span>
+    </div>
+    <div class="flow-source">
+      <i class="fas fa-hand"></i>
+      <strong>Manual entries</strong>
+      <span>Added by an analyst</span>
+    </div>
+  </div>
+  <div class="flow-converge"><img src="{{ misp_logo }}" alt="MISP">Everything is a MISP event</div>
+  <div class="flow-row flow-auto"><i class="fas fa-robot"></i><span class="text-muted">The analyser reads the scraper's events. The others go in when you pick them.</span></div>
+  <div class="flow-links">
+    <a href="{{ url_for('data_collection.index') }}" class="btn btn-xs btn-outline-secondary"><i class="fas fa-layer-group me-1"></i>Data collection</a>
+  </div>
+</div>
+{% endmacro %}
+
+{# Delivery channels. A Flowintel case is only made for an alert or an advisory. #}
+{% macro channels(flowintel=True) %}
+<div class="flow-channels">
+  <span class="flow-channel"><i class="fas fa-envelope" style="color:#0078f1;"></i>E-mail</span>
+  <span class="flow-channel"><i class="fas fa-comment-dots" style="color:#1c58d9;"></i>Mattermost</span>
+  <span class="flow-channel"><i class="fa-brands fa-microsoft" style="color:#5b5fc7;"></i>Teams</span>
+  {% if flowintel %}<span class="flow-channel"><img src="{{ url_for('static', filename='flowintel-icon.png') }}" alt="">Flowintel</span>{% endif %}
+</div>
+{% endmacro %}

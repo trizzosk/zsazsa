@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_flow_macros.html" import flow_help %}
 {% from "_product_actions.html" import preview_button, approval_form with context %}
 {% from "_sort_header.html" import sort_th with context %}
 
@@ -7,7 +8,7 @@
 
 {% block topbar_actions %}
 <a href="{{ url_for('threat_actor_profile.new') }}" class="btn btn-sm btn-primary">
-  <i class="fas fa-plus me-1"></i> New profile
+  <i class="fas fa-plus me-1"></i> New threat actor profile
 </a>
 <a href="{{ url_for('export.threat_actor_profiles') }}" class="btn btn-sm btn-outline-secondary ms-2"
    title="Export as Markdown">
@@ -32,6 +33,7 @@
             {% endif %}
           </div>
         </form>
+        {{ flow_help('How a threat actor profile is made') }}
       </div>
       {% if state_counts or tlp_counts or audience_counts %}
       <div class="col-lg-9 list-stats">
@@ -45,6 +47,8 @@
     </div>
   </div>
 </div>
+
+{% include "threat_actor_profile/_flow.html" %}
 
 <div class="card content-card">
   <div class="card-body p-0">

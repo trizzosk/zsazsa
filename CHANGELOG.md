@@ -18,6 +18,7 @@
 - The scheduled analyser can also make flash intel alerts from PIRs and GIRs, vulnerability advisories and the daily briefing. Switch them on under Settings > System > Analyser.
 - An asset database for vulnerability advisories, under Settings > Products. The analyser only makes an advisory for a CVE in a product listed in a CSV file of your assets.
 - The alert and advisory lists show under the title why the analyser made a draft: the requirement, focus points or CVE it matched.
+- The lists of daily briefings, flash intel alerts, vulnerability advisories, indicator feeds, threat actor profiles and detection engineering requests have a "How ... is made" line under their filters. It opens each step from collection to delivery, and who does it: an analyst or the analyser.
 - The audit log under Reporting > Logs is pruned after `AUDIT_LOG_RETENTION_DAYS`, 365 by default. 0 keeps it for good, which the Logs page then says.
 
 ### Changed
@@ -31,6 +32,8 @@
 - The manual collection entry locks its summary while an AI summary is being written, and an event created before the summary is done gets it when it is, shows the Markdown preview as high as the editor in split view, and links to the Collection sources for a missing source.
 - The PIR list hides rejected PIRs and the GIR list hides retired GIRs.
 - The stakeholder list has a PIR and a GIR column.
+- The Distribution card of a PIR or GIR marks its owner, also when the owner is not a recipient.
+- The "New" buttons on the product lists and on a saved manual entry name the product in full, such as "New flash intel alert" and "New detection engineering request".
 - The data collection table shows the ten words most titles share. A click on one searches for it.
 - On the data collection page, the actions of an event wait while an AI summary is being written for it, and come back when the summary ends.
 - While the analyser writes AI summaries for a daily briefing, flash intel alerts or advisories, the job says which one it is on.
@@ -58,6 +61,7 @@
 
 ### Fixed
 
+- A PIR's Collection coverage card counted fewer events than its scope preview, because it left out the ATT&CK techniques. Both now search the same scope values.
 - Bulk deletion checks the review state again on the event being deleted, so a product that is no longer rejected is not removed.
 - A stale approval form cannot publish a rejected briefing. Inline briefing approval also asks for confirmation when its summary is out of date, as the detail page does.
 - A PIR or GIR match from another MISP server or a manual source showed "Event not found" when opened from the scope preview or the PIR's recent matches. The link now names the source.

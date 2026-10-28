@@ -2431,3 +2431,185 @@ a.chart-row:hover { background: var(--surface-hover); }
 }
 .wizard-summary-icon { color: var(--border-light); font-size: 1.1rem; }
 .wizard-summary li.is-done .wizard-summary-icon { color: var(--accent-green); }
+
+/* ─── How a product is made (briefing, alert, advisory and feed lists) ───── */
+/* The line in the filter box, and the panel it opens */
+.flow-help {
+  display: inline-flex; align-items: center; gap: .35rem; margin-top: .5rem; padding: 0;
+  background: none; border: 0; color: var(--accent-blue); font-size: .78rem;
+}
+.flow-help:hover { text-decoration: underline; }
+.flow-panel-head {
+  display: flex; align-items: center; gap: .65rem; padding: .6rem .9rem;
+  color: var(--text-muted); font-size: .8rem;
+}
+.flow-panel-head .btn-close { font-size: .65rem; }
+.flow-panel-icon {
+  width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center; font-size: .8rem;
+  color: var(--accent-blue); background: color-mix(in srgb, var(--accent-blue) 12%, transparent);
+}
+
+/* What the analyser does, in purple, and what an analyst does by hand, in blue */
+.flow-auto { --mode-color: var(--accent-purple); }
+.flow-hand { --mode-color: var(--accent-blue); }
+.flow-modes { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+.flow-mode {
+  display: inline-flex; align-items: center; gap: .45rem; font-size: .78rem;
+  padding: .3rem .7rem; border-radius: 999px; border: 1px solid var(--mode-color);
+  background: color-mix(in srgb, var(--mode-color) 7%, transparent); color: var(--text-primary);
+}
+.flow-mode > i { color: var(--mode-color); }
+.flow-mode > img { height: 14px; width: auto; }
+.flow-rulezet { --mode-color: var(--neutral-600); }
+
+.flow { --flow-steps: 6; display: grid; grid-template-columns: repeat(var(--flow-steps), minmax(0, 1fr)); gap: 1.25rem; }
+.flow-4 { --flow-steps: 4; }
+.flow-5 { --flow-steps: 5; }
+@media (max-width: 1399px) {
+  .flow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .flow-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 767px)  { .flow, .flow-4 { grid-template-columns: 1fr; } }
+
+/* The funnel over the steps, only where they sit in one row */
+.flow-funnel { grid-column: 1 / -1; position: relative; height: 74px; display: none; }
+@media (min-width: 1400px) { .flow-funnel { display: block; } }
+.flow-funnel svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.flow-funnel-labels {
+  position: absolute; inset: 0; display: grid; grid-template-columns: repeat(var(--flow-steps), minmax(0, 1fr)); gap: 1.25rem;
+  align-items: center; text-align: center; font-size: .72rem; font-weight: 600; line-height: 1.15;
+  color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .25);
+}
+
+.flow-step {
+  position: relative; display: flex; flex-direction: column; gap: .6rem;
+  border: 1px solid var(--border-light); border-radius: var(--border-radius); background: var(--card-bg);
+  padding: .85rem; font-size: .78rem; line-height: 1.35;
+  box-shadow: 0 6px 18px -14px color-mix(in srgb, var(--step-color) 70%, transparent);
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+.flow-step:hover {
+  transform: translateY(-2px); border-color: var(--step-color);
+  box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--step-color) 55%, transparent);
+}
+.flow-step::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+  border-radius: var(--border-radius) var(--border-radius) 0 0; background: var(--step-color);
+}
+.flow-step.flow-is-auto { border-style: dashed; border-color: color-mix(in srgb, var(--accent-purple) 35%, var(--border-light)); }
+
+/* Between the steps: a chevron, or a dotted line where the analyser hands over */
+.flow-step:not(:last-child)::after {
+  content: "\f054"; font-family: "Font Awesome 6 Free"; font-weight: 900;
+  position: absolute; right: -1rem; top: 1.45rem; color: var(--neutral-500); font-size: .75rem;
+}
+.flow-step.flow-next-auto::after {
+  content: ""; right: -1.25rem; top: 1.95rem; width: 1.25rem; height: 0;
+  border-top: 2px dotted var(--accent-purple);
+}
+/* The funnel is child 1, so step n is child n + 1: no arrow after the last step of a row */
+@media (min-width: 768px) and (max-width: 1399px) {
+  .flow:not(.flow-4) .flow-step:nth-child(4)::after,
+  .flow-4 .flow-step:nth-child(3)::after { display: none; }
+}
+@media (max-width: 767px) {
+  .flow-step:not(:last-child)::after { content: "\f078"; right: 50%; top: auto; bottom: -1.1rem; }
+  .flow-step.flow-next-auto::after {
+    content: ""; right: 50%; bottom: -1.25rem; width: 0; height: 1.25rem;
+    border-top: 0; border-left: 2px dotted var(--accent-purple);
+  }
+}
+
+.flow-head { display: flex; align-items: center; gap: .65rem; }
+.flow-icon {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 1rem;
+  color: #fff; background: var(--step-color);
+  box-shadow: 0 4px 10px -4px color-mix(in srgb, var(--step-color) 70%, transparent);
+}
+.flow-head small { display: block; color: var(--step-color); font-weight: 700; font-size: .66rem; text-transform: uppercase; letter-spacing: .05em; }
+.flow-head strong { display: block; font-size: .9rem; line-height: 1.2; }
+
+/* Where the funnel is not shown, a bar in each step that gets shorter */
+.flow-meter { display: flex; flex-direction: column; gap: .2rem; color: var(--text-muted); font-size: .7rem; }
+.flow-meter-track { height: 6px; border-radius: 3px; background: var(--surface-muted); border: 1px solid var(--border-subtle); }
+.flow-meter-track span { display: block; height: 100%; border-radius: 3px; background: var(--step-color); opacity: .8; }
+@media (min-width: 1400px) { .flow-meter { display: none; } }
+
+.flow-row { display: flex; gap: .5rem; align-items: flex-start; }
+.flow-row > i { width: 1rem; text-align: center; margin-top: .15rem; color: var(--step-color); flex-shrink: 0; }
+.flow-row > img { height: 12px; width: auto; margin-top: .2rem; flex-shrink: 0; }
+.flow-row.flow-auto > i, .flow-who .flow-row > i { color: var(--mode-color); }
+.flow-who {
+  display: flex; flex-direction: column; gap: .35rem; padding: .5rem .6rem; border-radius: 8px;
+  background: color-mix(in srgb, var(--mode-color) 7%, transparent); border-left: 3px solid var(--mode-color);
+}
+.flow-who-title { font-weight: 700; font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; color: var(--mode-color); }
+
+/* What happens to an event */
+.flow-out { display: inline-flex; align-items: center; gap: .3rem; font-size: .68rem; font-weight: 600; padding: .05rem .45rem; border-radius: 999px; white-space: nowrap; }
+.flow-out-keep { color: var(--accent-green); background: color-mix(in srgb, var(--accent-green) 12%, transparent); }
+.flow-out-drop { color: var(--accent-red); background: color-mix(in srgb, var(--accent-red) 10%, transparent); }
+.flow-out-skip { color: var(--text-muted); background: var(--surface-muted); border: 1px solid var(--border-subtle); }
+/* A review state, in the colour the list's chart gives it */
+.flow-state {
+  font-size: .68rem; font-weight: 600; padding: .05rem .45rem; border-radius: 999px; white-space: nowrap;
+  color: var(--text-primary); background: color-mix(in srgb, var(--state-color) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--state-color) 45%, transparent);
+}
+.flow-states { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; }
+.flow-states > i { font-size: .6rem; color: var(--text-muted); }
+
+.flow-sources { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; }
+.flow-source {
+  position: relative; border: 1px solid var(--border-subtle); border-radius: 8px; padding: .5rem .45rem .45rem;
+  background: var(--surface-muted); text-align: center;
+}
+.flow-source img { height: 18px; width: auto; opacity: .85; }
+.flow-source > i { font-size: 1.05rem; color: var(--text-muted); }
+.flow-source strong { display: block; font-size: .72rem; margin-top: .25rem; line-height: 1.15; }
+.flow-source span { display: block; color: var(--text-muted); font-size: .66rem; line-height: 1.2; margin-top: .15rem; }
+.flow-source .flow-read {
+  position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; margin: 0; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; font-size: .55rem;
+  color: #fff; background: var(--accent-purple); border: 2px solid var(--card-bg);
+}
+.flow-converge {
+  display: flex; align-items: center; justify-content: center; gap: .5rem; padding: .4rem;
+  border: 1px dashed var(--step-color); border-radius: 8px; font-weight: 600; color: var(--text-primary);
+}
+.flow-converge img { height: 15px; width: auto; }
+
+/* The Diamond Model's four corners around the gem */
+.flow-diamond {
+  display: grid; grid-template-columns: 1fr auto 1fr; gap: .25rem .4rem; align-items: center; justify-items: center;
+  grid-template-areas: ". adversary ." "infrastructure gem capability" ". victim .";
+}
+.flow-diamond > i { grid-area: gem; color: var(--step-color); }
+.flow-diamond span {
+  font-size: .66rem; font-weight: 600; padding: .05rem .45rem; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--step-color) 45%, transparent);
+  background: color-mix(in srgb, var(--step-color) 8%, transparent);
+}
+.flow-diamond-adversary { grid-area: adversary; }
+.flow-diamond-infrastructure { grid-area: infrastructure; }
+.flow-diamond-capability { grid-area: capability; }
+.flow-diamond-victim { grid-area: victim; }
+
+/* Look-alikes of the list's buttons and of the channels: not clickable */
+.flow-buttons { display: flex; flex-wrap: wrap; gap: .3rem; }
+.flow-buttons .btn { pointer-events: none; font-size: .64rem; padding: .05rem .4rem; line-height: 1.5; }
+.flow-channels { display: grid; grid-template-columns: 1fr 1fr; gap: .35rem; }
+.flow-channel {
+  display: flex; align-items: center; gap: .4rem; font-size: .72rem; font-weight: 600;
+  border: 1px solid var(--border-subtle); border-radius: 8px; padding: .3rem .45rem; background: var(--surface-muted);
+}
+.flow-channel img { height: 14px; width: auto; }
+.flow-formats { display: flex; flex-wrap: wrap; gap: .3rem; }
+.flow-format {
+  font-family: var(--bs-font-monospace); font-size: .66rem; font-weight: 700; padding: .05rem .45rem; border-radius: 6px;
+  color: var(--step-color); border: 1px solid color-mix(in srgb, var(--step-color) 45%, transparent);
+  background: color-mix(in srgb, var(--step-color) 8%, transparent);
+}
+.flow-links { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: auto; padding-top: .2rem; }

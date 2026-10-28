@@ -7350,19 +7350,18 @@ def preview_scope_matches(scope_terms, limit=200, max_results=50, timeframe_hour
     return rows[:max_results]
 
 
-def pir_collection_gap(pir) -> dict:
-    """Return a coverage summary for a PIR against the recent collection.
+def pir_collection_gap(scope_terms) -> dict:
+    """Return a coverage summary for a PIR's scope terms against the recent collection.
 
-    Uses the PIR's focus point values as search terms against the cached
-    collection, across every configured source.
+    The terms are the ones its scope preview searches, ATT&CK techniques
+    included, so the two report the same events, across every configured source.
     Returns a dict with total matching events, the most recent match date, and
     up to 5 sample rows so the detail page can show a quick gap indicator without
     a second page load.
     """
-    fp_values = [fp.value for fp in getattr(pir, "focus_points", []) if fp.value]
-    if not fp_values:
+    if not scope_terms:
         return {"recent_matches": 0, "last_match_date": None, "sample": []}
-    matches = preview_scope_matches(fp_values)
+    matches = preview_scope_matches(scope_terms)
     last_date = None
     if matches:
         dates = [r["date"] for r in matches if r.get("date")]

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_flow_macros.html" import flow_help %}
 {% from "_macros.html" import audience_badges, feed_downloads %}
 
 {# Indicator feeds as a product list, in the shape the other CTI products use:
@@ -34,6 +35,7 @@
             {% endif %}
           </div>
         </form>
+        {{ flow_help('How an indicator feed is made') }}
       </div>
       {% if caching_counts or tlp_counts or audience_counts %}
       <div class="col-lg-9 list-stats">
@@ -47,6 +49,8 @@
     </div>
   </div>
 </div>
+
+{% include "indicator_feed/_flow.html" %}
 
 <div class="card content-card">
   <div class="card-body p-0">

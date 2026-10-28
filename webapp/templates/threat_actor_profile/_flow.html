@@ -1,0 +1,88 @@
+{# How a threat actor profile is made, under the filters of the profile list.
+   Five steps, all by an analyst: nothing here is made by the analyser. #}
+{% from "_flow_macros.html" import flow_card, funnel, step_head, channels %}
+{% call flow_card("From the MISP galaxies and your own findings to a profile in the stakeholders' inbox") %}
+<div class="flow-modes">
+  <span class="flow-mode flow-hand">
+    <i class="fas fa-user"></i>
+    <span>An analyst builds each profile with <a href="{{ url_for('threat_actor_profile.new') }}" class="fw-semibold">New threat actor profile</a>.</span>
+  </span>
+  <span class="flow-mode flow-auto">
+    <i class="fas fa-robot"></i>
+    <span>On request, the AI drafts the profile from what is already on the form.</span>
+  </span>
+</div>
+
+<div class="flow flow-5">
+  {{ funnel(["Your findings", "Galaxy and AI context", "One profile", "Published", "Delivered"],
+            colours=['--accent-cyan', '--accent-blue', '--accent-orange', '--neutral-700', '--accent-red'], narrow_at=560) }}
+
+  <div class="flow-step" style="--step-color:var(--accent-cyan);">
+    {{ step_head(1, 'fa-user-secret', 'Collection', 100, 'Your findings') }}
+    <div class="flow-who flow-hand">
+      <span class="flow-who-title"><i class="fas fa-user me-1"></i>By hand</span>
+      <div class="flow-row"><i class="fas fa-users-viewfinder"></i><span>Pick the threat actors from the MISP galaxy, or type one in.</span></div>
+      <div class="flow-row"><i class="fas fa-star"></i><span>Link the PIR the profile answers.</span></div>
+      <div class="flow-row"><i class="fas fa-note-sticky"></i><span>Keep your own findings as notes on the profile.</span></div>
+    </div>
+    <div class="flow-links">
+      <a href="{{ url_for('requirements.pir_list') }}" class="btn btn-xs btn-outline-secondary"><i class="fas fa-star me-1"></i>PIRs</a>
+    </div>
+  </div>
+
+  <div class="flow-step" style="--step-color:var(--accent-blue);">
+    {{ step_head(2, 'fa-wand-magic-sparkles', 'Enrichment', 75, 'Galaxy and AI context') }}
+    <div class="flow-row"><img src="{{ url_for('static', filename='misp-logo.png') }}" alt=""><span><strong>Complete profile with MISP galaxy data</strong> fills in the synonyms, origin, motivation, sponsorship, capabilities, mode of operation, countries, sectors and references.</span></div>
+    <div class="flow-row"><i class="fas fa-note-sticky"></i><span>The galaxy's victimology is kept as a note.</span></div>
+    <div class="flow-who flow-auto">
+      <span class="flow-who-title"><i class="fas fa-robot me-1"></i>AI</span>
+      <div class="flow-row"><i class="fas fa-pen-to-square"></i><span><strong>Draft profile with AI</strong> writes the fields from the actors and what is already on the form, nothing else.</span></div>
+    </div>
+  </div>
+
+  <div class="flow-step" style="--step-color:var(--accent-orange);">
+    {{ step_head(3, 'fa-pen-nib', 'Generate the draft', 50, 'One profile') }}
+    <div class="flow-row"><i class="fas fa-gem"></i><span>The profile page draws a <strong>Diamond Model</strong> from four of its fields.</span></div>
+    <div class="flow-diamond" aria-hidden="true">
+      <span class="flow-diamond-adversary">Adversary</span>
+      <span class="flow-diamond-infrastructure">Infrastructure</span>
+      <i class="fas fa-gem"></i>
+      <span class="flow-diamond-capability">Capability</span>
+      <span class="flow-diamond-victim">Victim</span>
+    </div>
+    <div class="flow-row"><i class="fas fa-rss"></i><span>Link <strong>indicator feeds</strong> to list the infrastructure you have seen.</span></div>
+    <div class="flow-row"><i class="fas fa-scale-balanced"></i><span>Attribution rationale, assessment confidence and source reliability.</span></div>
+    <div class="flow-row"><img src="{{ url_for('static', filename='rulezet-icon.png') }}" alt=""><span>Recommendations, with <strong>Search Rulezet</strong> for detection rules on its ATT&amp;CK techniques.</span></div>
+    <div class="flow-row"><i class="fas fa-file-lines"></i><span>Saved as a <span class="flow-state" style="--state-color:var(--neutral-500);">Draft</span>.</span></div>
+    <div class="flow-links">
+      <a href="{{ url_for('indicator_feed.index') }}" class="btn btn-xs btn-outline-secondary"><i class="fas fa-rss me-1"></i>Indicator feeds</a>
+    </div>
+  </div>
+
+  <div class="flow-step" style="--step-color:var(--neutral-700);">
+    {{ step_head(4, 'fa-clipboard-check', 'Review and approval', 25, 'Published') }}
+    <div class="flow-states">
+      <span class="flow-state" style="--state-color:var(--neutral-500);">Draft</span><i class="fas fa-arrow-right"></i>
+      <span class="flow-state" style="--state-color:var(--accent-green);">Published</span>
+    </div>
+    {# Look-alike of the list's button, not a button. #}
+    <div class="flow-buttons" aria-hidden="true">
+      <span class="btn btn-xs btn-success"><i class="fas fa-check me-1"></i>Approve &amp; publish</span>
+    </div>
+    <div class="flow-row"><i class="fas fa-user-group"></i><span>A profile needs an audience before it is approved.</span></div>
+  </div>
+
+  <div class="flow-step" style="--step-color:var(--accent-red);">
+    {{ step_head(5, 'fa-paper-plane', 'Publish', 25, 'Delivered') }}
+    <div class="flow-row"><img src="{{ url_for('static', filename='misp-logo.png') }}" alt=""><span>The MISP event is published.</span></div>
+    <div class="flow-row"><i class="fas fa-users"></i><span><strong>Notify</strong> sends it to the stakeholders subscribed to threat actor profiles, cleared for its TLP and with a role in its audience.</span></div>
+    {{ channels(flowintel=False) }}
+    <div class="flow-row"><i class="fas fa-gem"></i><span>The Diamond Model goes along as an image, and the linked indicator feeds are listed in it.</span></div>
+    <div class="flow-row"><i class="fas fa-user-check"></i><span><strong>Recipients</strong> shows who gets it before you notify.</span></div>
+    <div class="flow-row"><i class="fas fa-comments"></i><span>The stakeholders' feedback is recorded on the profile.</span></div>
+    <div class="flow-links">
+      <a href="{{ url_for('stakeholders.list') }}" class="btn btn-xs btn-outline-secondary"><i class="fas fa-users me-1"></i>Stakeholders</a>
+    </div>
+  </div>
+</div>
+{% endcall %}

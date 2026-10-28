@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import config as _cfg
 from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
+from core import asset_inventory
 from core.vuln_lookup import CVE_RE
 from webapp.routes.source_event_utils import (
     flattened_references,
@@ -188,6 +189,8 @@ def review():
         tlp_counts=tlp_counts(matching(all_veas, tests, skip="tlp")),
         audience_counts=misp_store.audience_counts(matching(all_veas, tests, skip="audience")),
         can_publish=misp_session.current_user_can_publish(),
+        schedule_advisories=getattr(_cfg, "ANALYSER_VULNERABILITY_ADVISORIES", False),
+        assets_enabled=asset_inventory.enabled(),
         sort=sort,
         dir=direction,
     )

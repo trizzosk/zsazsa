@@ -1,0 +1,95 @@
+{# How a detection engineering request is made, under the filters of the request
+   list. Written by an analyst, then followed on the engineering board.
+   rulezet_enabled comes from the app's template globals. #}
+{% from "_flow_macros.html" import flow_card, funnel, step_head, channels %}
+{% set rulezet_icon = url_for('static', filename='rulezet-icon.png') %}
+{% call flow_card("From a threat you have no detection for to a rule that is live") %}
+<div class="flow-modes">
+  <span class="flow-mode flow-hand">
+    <i class="fas fa-user"></i>
+    <span>An analyst writes each request with <a href="{{ url_for('detection_eng.wizard_new') }}" class="fw-semibold">New detection engineering request</a>, or from an event on Data collection.</span>
+  </span>
+  <span class="flow-mode flow-rulezet">
+    <img src="{{ rulezet_icon }}" alt="">
+    {% if rulezet_enabled %}
+    <span>Rulezet finds the public rules you may already have, and checks a rule before it goes live.</span>
+    {% else %}
+    <span>Rulezet is not configured, so no request can be marked Active.</span>
+    {% endif %}
+  </span>
+</div>
+
+<div class="flow">
+  {{ funnel(["Collected events", "Existing coverage", "One request", "Approved", "Delivered", "Live detection"],
+            colours=['--accent-cyan', '--accent-blue', '--accent-orange', '--neutral-700', '--accent-red', '--accent-green'], narrow_at=480) }}
+
+  <div class="flow-step" style="--step-color:var(--accent-cyan);">
+    {{ step_head(1, 'fa-satellite-dish', 'Collection', 100, 'Collected events') }}
+    <div class="flow-who flow-hand">
+      <span class="flow-who-title"><i class="fas fa-user me-1"></i>By hand</span>
+      <div class="flow-row"><i class="fas fa-layer-group"></i><span>Start from one or more events on Data collection, from any source, or from a blank form.</span></div>
+      <div class="flow-row"><i class="fas fa-star"></i><span>Link the PIR the request serves.</span></div>
+    </div>
+    <div class="flow-links">
+      <a href="{{ url_for('data_collection.index') }}" class="btn btn-xs btn-outline-secondary"><i class="fas fa-layer-group me-1"></i>Data collection</a>
+    </div>
+  </div>
+
+  <div class="flow-step" style="--step-color:var(--accent-blue);">
+    {{ step_head(2, 'fa-magnifying-glass', 'Enrichment', 75, 'Existing coverage') }}
+    <div class="flow-row"><img src="{{ url_for('static', filename='misp-logo.png') }}" alt=""><span>The ATT&amp;CK techniques are picked from the MISP galaxy.</span></div>
+    <div class="flow-row"><img src="{{ rulezet_icon }}" alt=""><span><strong>Search Rulezet</strong> looks up public rules for the techniques, in Sigma, YARA, Suricata and other formats.</span></div>
+    <div class="flow-row"><i class="fas fa-shield-halved"></i><span>The rules you already have go in as existing coverage, by name and link.</span></div>
+  </div>
+
+  <div class="flow-step" style="--step-color:var(--accent-orange);">
+    {{ step_head(3, 'fa-pen-nib', 'Generate the draft', 50, 'One request') }}
+    <div class="flow-row"><i class="fas fa-lightbulb"></i><span>The hypothesis, and what a hit should look like.</span></div>
+    <div class="flow-row"><i class="fas fa-server"></i><span>The log sources the detection needs.</span></div>
+    <div class="flow-row"><i class="fas fa-vial"></i><span>Test cases, the rule format and a priority.</span></div>
+    <div class="flow-row"><i class="fas fa-file-lines"></i><span><strong>Save draft</strong> keeps it a <span class="flow-state" style="--state-color:var(--neutral-500);">draft</span>.</span></div>
+  </div>
+
+  <div class="flow-step" style="--step-color:var(--neutral-700);">
+    {{ step_head(4, 'fa-clipboard-check', 'Review and approval', 25, 'Approved') }}
+    <div class="flow-states">
+      <span class="flow-state" style="--state-color:var(--neutral-500);">draft</span><i class="fas fa-arrow-right"></i>
+      <span class="flow-state" style="--state-color:var(--accent-blue);">pending review</span><i class="fas fa-arrow-right"></i>
+      <span class="flow-state" style="--state-color:var(--accent-green);">approved</span>
+      <span class="flow-state" style="--state-color:var(--accent-red);">rejected</span>
+    </div>
+    <div class="flow-row"><i class="fas fa-paper-plane"></i><span><strong>Submit for review</strong> asks for approval.</span></div>
+    <div class="flow-row"><i class="fas fa-table-columns"></i><span><strong>Approve first</strong> on the status board opens the request for review in the list.</span></div>
+    {# Look-alikes of the list's buttons, not buttons. #}
+    <div class="flow-buttons" aria-hidden="true">
+      <span class="btn btn-xs btn-success"><i class="fas fa-check me-1"></i>Approve &amp; publish</span>
+      <span class="btn btn-xs btn-outline-danger"><i class="fas fa-xmark me-1"></i>Reject</span>
+    </div>
+    <div class="flow-row"><i class="fas fa-user-group"></i><span>A request needs an audience before it is approved.</span></div>
+  </div>
+
+  <div class="flow-step" style="--step-color:var(--accent-red);">
+    {{ step_head(5, 'fa-paper-plane', 'Publish', 25, 'Delivered') }}
+    <div class="flow-row"><img src="{{ url_for('static', filename='misp-logo.png') }}" alt=""><span>Approving publishes the MISP event.</span></div>
+    <div class="flow-row"><i class="fas fa-users"></i><span>Sent to the stakeholders subscribed to detection engineering requests, cleared for its TLP and with a role in its audience.</span></div>
+    {{ channels(flowintel=False) }}
+    <div class="flow-row"><i class="fas fa-user-check"></i><span><strong>Recipients</strong> shows who gets it before you publish.</span></div>
+    <div class="flow-row"><i class="fas fa-comments"></i><span>The stakeholders' feedback is recorded on the request.</span></div>
+    <div class="flow-row"><i class="fas fa-rotate-right"></i><span><strong>Resend</strong> delivers it again.</span></div>
+  </div>
+
+  <div class="flow-step" style="--step-color:var(--accent-green);">
+    {{ step_head(6, 'fa-table-columns', 'Engineering board', 25, 'Live detection') }}
+    <div class="flow-states">
+      <span class="flow-state" style="--state-color:var(--neutral-500);">Pending</span><i class="fas fa-arrow-right"></i>
+      <span class="flow-state" style="--state-color:var(--accent-blue);">In Dev</span><i class="fas fa-arrow-right"></i>
+      <span class="flow-state" style="--state-color:var(--accent-orange);">In Test</span><i class="fas fa-arrow-right"></i>
+      <span class="flow-state" style="--state-color:var(--accent-green);">Active</span><i class="fas fa-arrow-right"></i>
+      <span class="flow-state" style="--state-color:var(--neutral-400);">Retired</span>
+    </div>
+    <div class="flow-row"><i class="fas fa-lock"></i><span>A request leaves Pending once it is approved, and never goes back.</span></div>
+    <div class="flow-row"><img src="{{ rulezet_icon }}" alt=""><span><strong>Active</strong> needs a draft rule that passes Rulezet's validator. Its rule is then locked.</span></div>
+    <div class="flow-row"><i class="fas fa-bell"></i><span>The first time it goes Active, the stakeholders are told it is live.</span></div>
+  </div>
+</div>
+{% endcall %}

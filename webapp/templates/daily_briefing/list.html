@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_flow_macros.html" import flow_help %}
 {% from "_product_actions.html" import preview_button, approval_form, rejection_button, delete_rejected_form with context %}
 {% from "_sort_header.html" import sort_th with context %}
 {% from "_macros.html" import ai_job_badge, story_scope %}
@@ -29,6 +30,7 @@
           </div>
         </form>
         {{ delete_rejected_form(url_for('daily_briefing.delete_rejected'), rejected_count) }}
+        {{ flow_help('How a daily briefing is made') }}
       </div>
       {% if state_counts or tlp_counts %}
       <div class="col-lg-9 list-stats">
@@ -41,6 +43,8 @@
     </div>
   </div>
 </div>
+
+{% include "daily_briefing/_flow.html" %}
 
 <div class="card content-card">
   <div class="card-body p-0">
