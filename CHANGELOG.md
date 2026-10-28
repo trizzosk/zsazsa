@@ -19,6 +19,7 @@
 - An asset database for vulnerability advisories, under Settings > Products. The analyser only makes an advisory for a CVE in a product listed in a CSV file of your assets.
 - The alert and advisory lists show under the title why the analyser made a draft: the requirement, focus points or CVE it matched.
 - The lists of daily briefings, flash intel alerts, vulnerability advisories, indicator feeds, threat actor profiles and detection engineering requests have a "How ... is made" line under their filters. It opens each step from collection to delivery, and who does it: an analyst or the analyser.
+- A PIR can be linked to one or more GIRs, picked from the active ones under its context. The PIR page links to them, and a GIR lists its linked PIRs under Classification.
 - The audit log under Reporting > Logs is pruned after `AUDIT_LOG_RETENTION_DAYS`, 365 by default. 0 keeps it for good, which the Logs page then says.
 
 ### Changed
@@ -87,6 +88,7 @@
 ### Upgrading
 
 - Threat actor profiles and indicator feeds made before this release have no TLP tag on their MISP event, and a product other than a flash intel alert whose TLP was changed still has its old tag. Saving the product again sets the right one.
+- The `zsazsa-pir` object template is now version 8 with a `linked-gir-uuids` attribute. Nothing needs doing; existing PIRs are linked to no GIR.
 - The `zsazsa-daily-briefing` object template is now version 6 with a `rejection-reason` attribute. Nothing needs doing; existing briefings keep their state and have no rejection reason until rejected.
 - zsazsa no longer runs on Python 3.10. `venv/bin/python --version` in the installation directory shows which one it uses. On 3.10, install Python 3.11 or later, move the old `venv` aside, create a new one as the web user with `python3.11 -m venv venv` (or the newer version you installed), and run `venv/bin/pip install -r requirements.txt` in it before restarting. The Docker installation runs its own Python 3.12 and needs nothing.
 - Nothing needs doing for the scope item notes. A note already stored stays in MISP, unread, until the requirement's scope is saved again, which writes its items without one.

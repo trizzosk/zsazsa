@@ -96,6 +96,8 @@ A GIR records intelligence needs over longer cycles, including review cadence, s
 
 As with a PIR, you can add scope items and threat context to a GIR so that matching events are highlighted automatically in the data collection view.
 
+A PIR can be linked to the GIRs it falls under, on the PIR's form. The GIR page lists the PIRs linked to it.
+
 #### RFI
 
 The RFI workflow covers intake through closure, with priority, SLA, owner assignment, requirement linkage and response tracking.

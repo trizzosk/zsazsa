@@ -663,6 +663,9 @@ document.addEventListener('change', function(e) {
   if (e.target.matches('.actor-type-pill input[type="checkbox"]')) {
     var pill = e.target.closest('.actor-type-pill');
     if (pill) pill.classList.toggle('selected', e.target.checked);
+    markStoryEdited(e.target.closest('.story-card'));
+    markSummaryStale();
+    refreshRail();
   }
   if (e.target.id === 'briefing-tlp') syncShellMeta();
 });
@@ -1402,9 +1405,11 @@ function draftStory(idx, eventUuid) {
       var anyChecked = document.querySelector('input[name="story_' + idx + '_threat_actor_types"]:checked');
       if (!anyChecked) {
         var cb = document.querySelector('input[name="story_' + idx + '_threat_actor_types"][value="' + CSS.escape(data.threat_actor_type) + '"]');
+        // The model's pick is part of its draft, so it skips the change event
+        // that would mark the story as edited by the analyst.
         if (cb) {
           cb.checked = true;
-          cb.dispatchEvent(new Event('change', {bubbles: true}));
+          cb.closest('.actor-type-pill').classList.add('selected');
         }
       }
     }

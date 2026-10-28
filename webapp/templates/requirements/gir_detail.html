@@ -268,6 +268,19 @@
           <dd><span class="badge status-badge status-{{ gir.status | lower }}">{{ gir.status }}</span></dd>
           <dt>Review cycle</dt>
           <dd>{{ gir.review_cycle or '-' }}</dd>
+          {# Set on the PIR form, so read-only here. #}
+          <dt>Linked PIRs</dt>
+          <dd>
+            {% for p in linked_pirs %}
+            <div class="mb-1">
+              <a href="{{ url_for('requirements.pir_detail', id=p.id) }}" class="text-decoration-none">
+                <span class="req-id-badge me-1">{{ p.pir_id }}</span>{{ p.question | truncate(60) }}
+              </a>
+            </div>
+            {% else %}
+            <span class="text-muted">None. Link one from the PIR's form.</span>
+            {% endfor %}
+          </dd>
           <dt>Created</dt>
           <dd>{{ gir.created_at.strftime('%d-%m-%Y') if gir.created_at else '-' }}</dd>
           <dt>Created by</dt>

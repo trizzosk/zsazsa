@@ -145,6 +145,27 @@ class BriefingComposeForm(unittest.TestCase):
         self.assertEqual(
             self.page.locator("#pane-story-1 .story-drafted-by").input_value(), "ai-edited")
 
+    def test_picking_a_threat_actor_type_marks_a_drafted_story_as_reworked(self):
+        self.open_pane("story-1")
+        self.page.evaluate(
+            "() => document.querySelector('#pane-story-1 .story-drafted-by').value = 'ai'")
+        self.page.locator("#pane-story-1 .actor-type-pill").first.click()
+        self.assertEqual(
+            self.page.locator("#pane-story-1 .story-drafted-by").input_value(), "ai-edited")
+
+    def test_the_threat_actor_type_the_model_picks_leaves_the_draft_as_drafted(self):
+        self.open_pane("story-1")
+        # The model only picks a type when the analyst has picked none.
+        self.page.evaluate("""() => document.querySelectorAll('#pane-story-1 .actor-type-pill input')
+            .forEach(cb => { cb.checked = false; cb.parentElement.classList.remove('selected'); })""")
+        kind = self.page.locator("#pane-story-1 .actor-type-pill input").first.get_attribute("value")
+        self.page.route("**/api/draft-story", lambda route: route.fulfill(
+            json={"story": "Drafted.", "threat_actor_type": kind}))
+        self.page.locator("#pane-story-1 .btn-draft-story").click()
+        self.page.locator("#pane-story-1 .actor-type-pill.selected").first.wait_for()
+        self.assertEqual(
+            self.page.locator("#pane-story-1 .story-drafted-by").input_value(), "ai")
+
     # ── the summary and its staleness ────────────────────────────────────────
 
     def test_changing_a_story_marks_an_existing_summary_out_of_date(self):

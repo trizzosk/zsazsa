@@ -23,6 +23,15 @@
   {% if pir.context %}
   <p class="question-banner-context">{{ pir.context }}</p>
   {% endif %}
+  {% if linked_girs %}
+  <p class="question-banner-context">
+    Related GIRs:
+    {% for g in linked_girs %}
+    <a href="{{ url_for('requirements.gir_detail', id=g.id) }}" class="text-decoration-none ms-1">
+      <span class="req-id-badge">{{ g.gir_id }}</span> {{ g.topic }}</a>{{ ',' if not loop.last }}
+    {% endfor %}
+  </p>
+  {% endif %}
 </div>
 
 <div class="row g-4">

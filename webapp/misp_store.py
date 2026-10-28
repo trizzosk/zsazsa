@@ -1313,6 +1313,7 @@ def _pir_ns(event):
         rejection_reason=_obj_attr(obj, "rejection-reason") or "",
         deferral_reason=_obj_attr(obj, "deferral-reason") or "",
         linked_pir_uuid=_obj_attr(obj, "linked-pir-uuid") or "",
+        linked_gir_uuids=_json_list(_obj_attr(obj, "linked-gir-uuids")),
         mitre_attack_techniques=_json_list(_obj_attr(obj, "mitre-attack-techniques")),
         triage_checklist=_json_list(_obj_attr(obj, "triage-checklist")),
         creator=_obj_attr(obj, "creator") or "",
@@ -1439,6 +1440,7 @@ def _pir_obj(data):
     _oa(obj, "rejection-reason", data.get("rejection_reason"))
     _oa(obj, "deferral-reason", data.get("deferral_reason"))
     _oa(obj, "linked-pir-uuid", data.get("linked_pir_uuid"))
+    _oa_json(obj, "linked-gir-uuids", data.get("linked_gir_uuids", []))
     _oa_json(obj, "mitre-attack-techniques", data.get("mitre_attack_techniques", []))
     _oa_json(obj, "triage-checklist", data.get("triage_checklist", []))
     _oa(obj, "creator", data.get("creator"))
@@ -1922,6 +1924,7 @@ def _pir_data_from_ns(ns):
         "rejection_reason": getattr(ns, "rejection_reason", "") or "",
         "deferral_reason": getattr(ns, "deferral_reason", "") or "",
         "linked_pir_uuid": getattr(ns, "linked_pir_uuid", "") or "",
+        "linked_gir_uuids": list(getattr(ns, "linked_gir_uuids", []) or []),
         "triage_checklist": list(getattr(ns, "triage_checklist", []) or []),
         "mitre_attack_techniques": list(getattr(ns, "mitre_attack_techniques", []) or []),
     }

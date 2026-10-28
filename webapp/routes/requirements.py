@@ -251,6 +251,7 @@ def _pir_form_data(form, stakeholders, focus_points=()):
     return {
         "question": form["question"],
         "context": form.get("context"),
+        "linked_gir_uuids": form.getlist("linked_gir_uuids"),
         "intel_level": [v for v in form.getlist("intel_level") if v in INTEL_LEVELS],
         "owner_uuid": owner_uuid,
         "owner_name": owner_name,
@@ -281,6 +282,12 @@ def _pir_form_data(form, stakeholders, focus_points=()):
         "next_review": form.get("next_review") or None,
         "mitre_attack_techniques": form.getlist("mitre_attack_techniques"),
     }
+
+
+def _linkable_girs(linked=()):
+    """The GIRs a PIR can be linked to: the active ones, and those it already
+    is, so that saving the form keeps a GIR that has since been retired."""
+    return [g for g in misp_store.list_girs() if g.status == "Active" or g.uuid in linked]
 
 
 def _gir_form_data(form, stakeholders, focus_points=()):
@@ -422,6 +429,7 @@ def pir_new():
         "requirements/pir_form.html",
         pir=None,
         prefill=prefill,
+        girs=_linkable_girs(),
         stakeholders=stakeholders,
         org_map=org_store.org_map(),
         priorities=MOSCOW_PRIORITIES,
@@ -450,6 +458,9 @@ def pir_detail(id):
         coverage = misp_store.pir_collection_gap(scope_terms)
     except Exception as exc:
         logger.warning("collection gap check failed for %s: %s", id, exc)
+    linked_girs = []
+    if pir.linked_gir_uuids:
+        linked_girs = [g for g in misp_store.list_girs() if g.uuid in pir.linked_gir_uuids]
 
     return render_template(
         "requirements/pir_detail.html",
@@ -462,6 +473,7 @@ def pir_detail(id):
         selected_count=sum(1 for stakeholder in distribution if stakeholder.in_distribution),
         scope_terms=scope_terms,
         coverage=coverage,
+        linked_girs=linked_girs,
         **_galaxy_context(),
     )
 
@@ -499,6 +511,7 @@ def pir_edit(id):
     return render_template(
         "requirements/pir_form.html",
         pir=pir,
+        girs=_linkable_girs(pir.linked_gir_uuids),
         triage_checklist=PIR_TRIAGE_CHECKLIST,
         stakeholders=stakeholders,
         org_map=org_store.org_map(),
@@ -751,6 +764,7 @@ def gir_detail(id):
     return render_template(
         "requirements/gir_detail.html",
         gir=gir,
+        linked_pirs=[p for p in misp_store.list_pirs() if gir.uuid in p.linked_gir_uuids],
         focus_points=gir.focus_points,
         categories=FOCUS_CATEGORIES,
         fp_by_category=fp_by_category,

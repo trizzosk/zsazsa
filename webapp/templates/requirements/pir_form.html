@@ -53,6 +53,22 @@
           <textarea name="context" class="form-control" rows="2"
             placeholder="Why is this question being asked? What triggered this request?">{{ pir.context if is_edit else '' }}</textarea>
         </div>
+        {% if girs %}
+        <div class="mt-3">
+          <label class="form-label">Related GIRs</label>
+          {% set linked_girs = pir.linked_gir_uuids if is_edit else [] %}
+          {% for g in girs %}
+          <div class="form-check mb-0">
+            <input class="form-check-input" type="checkbox" name="linked_gir_uuids" value="{{ g.uuid }}"
+                   id="gir_{{ loop.index }}" {{ 'checked' if g.uuid in linked_girs }}>
+            <label class="form-check-label" for="gir_{{ loop.index }}">
+              <span class="req-id-badge me-1">{{ g.gir_id }}</span>{{ g.topic }}
+            </label>
+          </div>
+          {% endfor %}
+          <div class="form-text">Optional. A linked GIR lists this PIR on its own page.</div>
+        </div>
+        {% endif %}
       </div>
     </div>
 

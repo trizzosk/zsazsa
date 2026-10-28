@@ -45,6 +45,15 @@ def _pir(uuid=UUID, **fields):
     return misp_store._pir_ns(event)
 
 
+def _gir(uuid=UUID, **fields):
+    """A GIR as get_gir returns one, read from a stored event."""
+    event = MISPEvent()
+    event.uuid = uuid
+    event.date = "2026-10-01"
+    event.add_object(misp_store._gir_obj({"gir_id": "GIR-001", "topic": "Grid threats", **fields}))
+    return misp_store._gir_ns(event)
+
+
 def _app(*blueprints):
     app = Flask(__name__)
     app.secret_key = "test"
@@ -144,6 +153,7 @@ class IntelligenceLevelRequired(unittest.TestCase):
                         mock.patch.object(config, "MISP_SESSION_REDIRECT_TO_LOGIN", False),
                         mock.patch.object(collection_cache, "start_worker"),
                         mock.patch.object(misp_store, "list_stakeholders", return_value=[]),
+                        mock.patch.object(misp_store, "list_girs", return_value=[]),
                         mock.patch.object(misp_store, "collection_source_groups", return_value={}),
                         mock.patch.object(misp_store, "get_pir", return_value=_pir()),
                         mock.patch.object(misp_store, "get_gir", return_value=SimpleNamespace(
@@ -295,6 +305,50 @@ class RfiPirChoice(unittest.TestCase):
     def test_an_edit_keeps_the_pir_the_rfi_is_linked_to(self):
         stored = SimpleNamespace(uuid=UUID, rfi_id="RFI-001", status="Acknowledged", linked_pir_uuid=self.THIRD)
         self.assertEqual(self.offered(f"/rfis/{UUID}/edit", stored), [UUID, self.THIRD])
+
+
+class PirGirLinks(unittest.TestCase):
+    """A PIR is linked to GIRs on its form, which offers the active ones and any
+    it is linked to already. The link is kept on the PIR, so the GIR page only
+    lists the PIRs that name it."""
+
+    setUp = IntelligenceLevelRequired.setUp
+    RETIRED = "9c1d2e3f-4a5b-4c6d-8e7f-a0b1c2d3e4f5"
+
+    def girs(self):
+        return [_gir(OTHER, gir_id="GIR-001", topic="Grid threats", status="Active"),
+                _gir(self.RETIRED, gir_id="GIR-002", topic="Old topic", status="Retired")]
+
+    def offered(self, page):
+        return [(box["value"], box.has_attr("checked")) for box in page.select('input[name="linked_gir_uuids"]')]
+
+    def test_the_form_offers_the_active_girs_and_the_linked_ones(self):
+        with mock.patch.object(misp_store, "list_girs", return_value=self.girs()), \
+             mock.patch.object(misp_store, "get_pir", return_value=_pir(linked_gir_uuids=[self.RETIRED])):
+            new = BeautifulSoup(self.client.get("/pirs/new").data, "html.parser")
+            edit = BeautifulSoup(self.client.get(f"/pirs/{UUID}/edit").data, "html.parser")
+        self.assertEqual(self.offered(new), [(OTHER, False)])
+        self.assertEqual(self.offered(edit), [(OTHER, False), (self.RETIRED, True)])
+
+    def test_a_save_stores_the_ticked_girs_and_a_status_move_keeps_them(self):
+        with mock.patch.object(misp_store, "update_pir") as update:
+            self.client.post(f"/pirs/{UUID}/edit", data={"csrf_token": "token", "question": "q",
+                                                         "intel_level": "Strategic", "linked_gir_uuids": [OTHER]})
+        self.assertEqual(update.call_args.args[1]["linked_gir_uuids"], [OTHER])
+        self.assertEqual(misp_store.pir_to_data(_pir(linked_gir_uuids=[OTHER]))["linked_gir_uuids"], [OTHER])
+
+    def test_each_page_links_to_the_other(self):
+        pir = _pir(linked_gir_uuids=[OTHER])
+        with mock.patch.object(misp_store, "list_girs", return_value=self.girs()), \
+             mock.patch.object(misp_store, "list_pirs", return_value=[pir, _pir(self.RETIRED)]), \
+             mock.patch.object(misp_store, "get_pir", return_value=pir), \
+             mock.patch.object(misp_store, "get_gir", return_value=self.girs()[0]), \
+             mock.patch.object(misp_store, "pir_collection_gap", return_value={}):
+            pir_page = BeautifulSoup(self.client.get(f"/pirs/{UUID}").data, "html.parser")
+            gir_page = BeautifulSoup(self.client.get(f"/girs/{OTHER}").data, "html.parser")
+        self.assertEqual([a["href"] for a in pir_page.select(".question-banner a")], [f"/girs/{OTHER}"])
+        linked = gir_page.find("dt", string="Linked PIRs").find_next_sibling("dd")
+        self.assertEqual([a["href"] for a in linked.select("a")], [f"/pirs/{UUID}"])
 
 
 class ProductPirChoice(unittest.TestCase):
